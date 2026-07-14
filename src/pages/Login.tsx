@@ -19,11 +19,15 @@ export default function Login() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (await login(username, password)) {
-      navigate(dest, { replace: true });
-    } else {
-      setError(true);
+    try {
+      if (await login(username, password)) {
+        navigate(dest, { replace: true });
+        return;
+      }
+    } catch {
+      /* e.g. crypto.subtle missing — surface as a failed login, not a silent no-op */
     }
+    setError(true);
   };
 
   return (

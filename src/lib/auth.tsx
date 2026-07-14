@@ -24,6 +24,9 @@ const CREDENTIAL_HASH = "3ef6f858bd8979fafae9e59c49b0a25fc98604f6c189f1ed8454aaa
 const PASSWORD_HASH = "a9c92dc7a265d1610c1a9529cac0795c98cb6f6d7eaf9b3c75358921e97a4e49";
 
 async function sha256Hex(input: string): Promise<string> {
+  // Web Crypto is only exposed in a SECURE context (HTTPS / localhost). The app
+  // force-redirects http→https at startup (see main.tsx) and the host enforces
+  // HTTPS, so crypto.subtle is always present by the time this runs.
   const bytes = new TextEncoder().encode(input);
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   return Array.from(new Uint8Array(digest))
