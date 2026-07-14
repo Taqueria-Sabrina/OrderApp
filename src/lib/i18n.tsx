@@ -31,12 +31,14 @@ const ES: Dict = {
   live: "EN VIVO",
 
   "board.today": "Hoy",
-  "board.tagline": "Tacos veganos · hechos con cariño",
+  "board.tagline": "Tacos. Tacos. Tacos.",
   "board.open": "Abierto ahora",
   "board.closed": "Cerrado",
   "board.soldout": "Agotado",
   "board.none": "Hoy descansamos — vuelve pronto",
+  "board.ig_follow": "Síguenos en Instagram",
   "board.staff": "Entrar (equipo)",
+  "board.copyright": "© 2026 Taqueria Sabrina",
 
   "menu.storefront": "Escaparate",
   "menu.open_label": "Abierto ahora",
@@ -150,12 +152,14 @@ const EN: Dict = {
   live: "LIVE",
 
   "board.today": "Today",
-  "board.tagline": "Vegan tacos · made with love",
+  "board.tagline": "Tacos. Tacos. Tacos.",
   "board.open": "Open now",
   "board.closed": "Closed",
   "board.soldout": "Sold out",
   "board.none": "We're resting today — come back soon",
+  "board.ig_follow": "Follow us on Instagram",
   "board.staff": "Staff sign in",
+  "board.copyright": "© 2026 Taqueria Sabrina",
 
   "menu.storefront": "Storefront",
   "menu.open_label": "Open now",
