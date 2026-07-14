@@ -95,20 +95,23 @@ export default function MenuBoard() {
           <span>3×7€</span>
         </div>
 
-        {/* Instagram follow card */}
+        {/* Instagram follow card — stacks on narrow screens so the button drops
+            below the text instead of crowding it, goes side-by-side at sm+ */}
         <a
           href="https://instagram.com/taqueriasabrina"
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-6 flex items-center gap-3 rounded-2xl border-2 border-line bg-paper p-3 shadow-sm transition active:scale-[0.99]"
+          className="mt-6 flex flex-col gap-3 rounded-2xl border-2 border-line bg-paper p-3 shadow-sm transition active:scale-[0.99] sm:flex-row sm:items-center"
         >
-          <img src={`${import.meta.env.BASE_URL}favicon.png`} alt="" className="h-12 w-12 shrink-0 rounded-full object-cover" />
-          <div className="min-w-0 flex-1">
-            <p className="font-display text-lg font-black leading-tight text-ink">@taqueriasabrina</p>
-            <p className="text-[13px] font-bold text-ink-soft">{t("board.ig_follow")}</p>
+          <div className="flex min-w-0 items-center gap-3 sm:flex-1">
+            <img src={`${import.meta.env.BASE_URL}favicon.png`} alt="" className="h-12 w-12 shrink-0 rounded-full object-cover" />
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-display text-lg font-black leading-tight text-ink">@taqueriasabrina</p>
+              <p className="text-[13px] font-bold text-ink-soft">{t("board.ig_follow")}</p>
+            </div>
           </div>
           <span
-            className="shrink-0 rounded-full px-4 py-1.5 text-xs font-extrabold uppercase tracking-wide text-white"
+            className="shrink-0 rounded-full px-4 py-2 text-center text-xs font-extrabold uppercase tracking-wide text-white sm:py-1.5"
             style={{ backgroundColor: "#c8437f" }}
           >
             Instagram
