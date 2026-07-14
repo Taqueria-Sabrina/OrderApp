@@ -1,0 +1,11 @@
+{
+  "scripts": {
+    "install": "cd .. && npm install && cd tempo && npm install",
+    "start": "npm run dev"
+  },
+  "apps": [
+    {
+      "appStart": "npx vite --port=${PORT} --strictPort"
+    }
+  ]
+}

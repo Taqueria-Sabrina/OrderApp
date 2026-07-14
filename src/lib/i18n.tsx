@@ -1,0 +1,284 @@
+import { createContext, useContext, useState, type ReactNode } from "react";
+
+export type Lang = "es" | "en";
+
+const LANG_KEY = "popup-orders/lang";
+
+/** Currency formatting differs by locale: "3€" (es) vs "€3" (en). */
+export function money(n: number, lang: Lang) {
+  const v = Math.round(n);
+  return lang === "en" ? `€${v}` : `${v}€`;
+}
+
+/** Long, human date in the active locale, e.g. "viernes, 14 de julio". */
+export function longDate(d: Date, lang: Lang) {
+  return new Intl.DateTimeFormat(lang === "en" ? "en-GB" : "es-ES", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).format(d);
+}
+
+type Str = string | ((p: Record<string, string | number>) => string);
+type Dict = Record<string, Str>;
+
+const ES: Dict = {
+  "nav.order": "Pedido",
+  "nav.queue": "Cocina",
+  "nav.sales": "Ventas",
+  "nav.history": "Historial",
+  "nav.menu": "Menú",
+  live: "EN VIVO",
+
+  "board.today": "Hoy",
+  "board.tagline": "Tacos veganos · hechos con cariño",
+  "board.open": "Abierto ahora",
+  "board.soldout": "Agotado",
+  "board.none": "Hoy descansamos — vuelve pronto 💛",
+  "board.staff": "Entrar (equipo)",
+
+  "login.title": "Trastienda",
+  "login.sub": "Solo para el equipo de Sabrina",
+  "login.ph": "Código del equipo",
+  "login.enter": "Entrar",
+  "login.error": "Código incorrecto",
+  "login.public": "← Ver el menú público",
+  "logout": "Salir",
+
+  "order.name_ph": "Nombre del cliente (opcional)",
+  "order.noname": "Sin nombre",
+
+  "hist.kicker": "Trastienda",
+  "hist.title": "Pedidos Anteriores",
+  "hist.sub": ({ n }) => `${n} pedido${Number(n) === 1 ? "" : "s"} en total`,
+  "hist.empty": "Aún no hay pedidos.",
+  "hist.done": "Entregado",
+  "hist.active": "En curso",
+
+  "home.subtitle": "La Cocina Lot · servicio del viernes",
+  "home.revenue": "Ingresos",
+  "home.sold": "Vendidos",
+  "home.open": "Abiertos",
+  "home.take_order": "Tomar Pedido",
+  "home.take_order_sub": "Arma un ticket",
+  "home.kitchen": "Cocina",
+  "home.kitchen_sub": "Nuevo → Cocinando → Listo",
+  "home.sales": "Ventas",
+  "home.sales_sub": "Vendidos + ingresos",
+  "home.week_menu": "Menú de la Semana",
+  "home.week_menu_sub": "Edita los 4 tacos",
+  "home.on_menu": "En el menú esta semana",
+  "home.sync_note": "Abre esto en cada teléfono — los pedidos se sincronizan en vivo.",
+
+  "order.kicker": "Nuevo Pedido",
+  "order.title": "Toca y Arma",
+  "order.note_ph": "Añade una nota (sin cebolla, extra crema…)",
+  "order.tacos": ({ n }) => `${n} taco${Number(n) === 1 ? "" : "s"}`,
+  "order.send": "Enviar Pedido →",
+  "order.sent": "¡Enviado! ✓",
+  "order.save": ({ amt }) => `Ahorras ${amt}`,
+
+  "queue.title": "Cocina",
+  "queue.sub": ({ n }) => `${n} ticket${Number(n) === 1 ? "" : "s"} · más antiguos primero`,
+  "queue.new": "Nuevo",
+  "queue.cooking": "Cocinando",
+  "queue.ready": "Listo",
+  "queue.start": "Empezar a Cocinar →",
+  "queue.mark_ready": "Marcar Listo ✓",
+  "queue.clear": "Entregado · Quitar",
+  "queue.empty": "Nada por aquí",
+  "queue.now": "ahora",
+  "queue.min_ago": ({ m }) => `hace ${m} min`,
+
+  "dash.kicker": "Cocina · Trastienda",
+  "dash.title": "Números de Hoy",
+  "dash.revenue": "Ingresos",
+  "dash.orders": ({ n }) => `${n} pedidos`,
+  "dash.sold": "Tacos Vendidos",
+  "dash.per_order": ({ x }) => `${x} / pedido`,
+  "dash.sold_by": "Vendidos por Taco",
+  "dash.in_sales": ({ x }) => `${x} en ventas`,
+  "dash.off": "· off",
+  "dash.note": "🔥 Los números se actualizan en vivo cuando entran pedidos del mostrador.",
+  "dash.close_day": "Cerrar el día",
+  "dash.close_day_sub": "Archiva el servicio de hoy y reinicia el tablero",
+  "dash.close_confirm": "Introduce el código para cerrar el día",
+  "dash.close_ph": "Código del equipo",
+  "dash.close_go": "Cerrar y archivar",
+  "dash.close_cancel": "Cancelar",
+  "dash.close_error": "Código incorrecto",
+  "dash.closed": "¡Día cerrado y archivado! ✓",
+
+  "dash.past_weeks": "Semanas Anteriores",
+  "dash.past_empty": "Aún no hay servicios archivados.",
+  "dash.past_orders": ({ n }) => `${n} pedido${Number(n) === 1 ? "" : "s"}`,
+  "dash.this_week": "Esta semana (en curso)",
+  "dash.view": "Ver",
+  "dash.hide": "Ocultar",
+  "dash.del": "Eliminar",
+  "dash.del_confirm": "Introduce el código para eliminar este servicio archivado",
+  "dash.del_go": "Eliminar para siempre",
+
+  "menu.kicker": "Configuración Semanal",
+  "menu.title": "Los 4 Tacos de la Semana",
+  "menu.sub": "Renombra, cambia precio o 86 un taco. Se sincroniza a cada teléfono.",
+  "menu.on_menu": "En el menú",
+  "menu.hidden": "Oculto · 86'd",
+  "menu.reset": "Reiniciar servicio (borrar pedidos)",
+  "menu.reset_confirm": "¿Reiniciar el servicio? Borra todos los pedidos y restaura el menú por defecto.",
+};
+
+const EN: Dict = {
+  "nav.order": "Order",
+  "nav.queue": "Queue",
+  "nav.sales": "Sales",
+  "nav.history": "History",
+  "nav.menu": "Menu",
+  live: "LIVE",
+
+  "board.today": "Today",
+  "board.tagline": "Vegan tacos · made with love",
+  "board.open": "Open now",
+  "board.soldout": "Sold out",
+  "board.none": "We're resting today — come back soon 💛",
+  "board.staff": "Staff sign in",
+
+  "login.title": "Back of House",
+  "login.sub": "Sabrina crew only",
+  "login.ph": "Crew passcode",
+  "login.enter": "Enter",
+  "login.error": "Wrong passcode",
+  "login.public": "← View public menu",
+  "logout": "Sign out",
+
+  "order.name_ph": "Customer name (optional)",
+  "order.noname": "No name",
+
+  "hist.kicker": "Back of House",
+  "hist.title": "Past Orders",
+  "hist.sub": ({ n }) => `${n} order${Number(n) === 1 ? "" : "s"} total`,
+  "hist.empty": "No orders yet.",
+  "hist.done": "Picked up",
+  "hist.active": "In progress",
+
+  "home.subtitle": "La Cocina Lot · Friday service",
+  "home.revenue": "Revenue",
+  "home.sold": "Sold",
+  "home.open": "Open",
+  "home.take_order": "Take Order",
+  "home.take_order_sub": "Build a ticket",
+  "home.kitchen": "Kitchen",
+  "home.kitchen_sub": "New → Cooking → Ready",
+  "home.sales": "Sales",
+  "home.sales_sub": "Sold + revenue",
+  "home.week_menu": "This Week's Menu",
+  "home.week_menu_sub": "Edit the 4 tacos",
+  "home.on_menu": "On the menu this week",
+  "home.sync_note": "Open this on every phone — orders sync live across all of them.",
+
+  "order.kicker": "New Order",
+  "order.title": "Tap to Build",
+  "order.note_ph": "Add a note (no onions, extra crema…)",
+  "order.tacos": ({ n }) => `${n} taco${Number(n) === 1 ? "" : "s"}`,
+  "order.send": "Send Order →",
+  "order.sent": "Sent! ✓",
+  "order.save": ({ amt }) => `You save ${amt}`,
+
+  "queue.title": "Kitchen",
+  "queue.sub": ({ n }) => `${n} ticket${Number(n) === 1 ? "" : "s"} · oldest first`,
+  "queue.new": "New",
+  "queue.cooking": "Cooking",
+  "queue.ready": "Ready",
+  "queue.start": "Start Cooking →",
+  "queue.mark_ready": "Mark Ready ✓",
+  "queue.clear": "Picked Up · Clear",
+  "queue.empty": "Nothing here",
+  "queue.now": "just now",
+  "queue.min_ago": ({ m }) => `${m} min ago`,
+
+  "dash.kicker": "Back of House",
+  "dash.title": "Tonight's Numbers",
+  "dash.revenue": "Revenue",
+  "dash.orders": ({ n }) => `${n} orders`,
+  "dash.sold": "Tacos Sold",
+  "dash.per_order": ({ x }) => `${x} / order`,
+  "dash.sold_by": "Sold by Taco",
+  "dash.in_sales": ({ x }) => `${x} in sales`,
+  "dash.off": "· off",
+  "dash.note": "🔥 Numbers update live as orders fire from the front counter.",
+  "dash.close_day": "Close out the day",
+  "dash.close_day_sub": "Archive today's service and reset the board",
+  "dash.close_confirm": "Enter the passcode to close out the day",
+  "dash.close_ph": "Crew passcode",
+  "dash.close_go": "Close & archive",
+  "dash.close_cancel": "Cancel",
+  "dash.close_error": "Wrong passcode",
+  "dash.closed": "Day closed & archived! ✓",
+
+  "dash.past_weeks": "Past Weeks",
+  "dash.past_empty": "No archived services yet.",
+  "dash.past_orders": ({ n }) => `${n} order${Number(n) === 1 ? "" : "s"}`,
+  "dash.this_week": "This week (in progress)",
+  "dash.view": "View",
+  "dash.hide": "Hide",
+  "dash.del": "Delete",
+  "dash.del_confirm": "Enter the passcode to delete this archived service",
+  "dash.del_go": "Delete forever",
+
+  "menu.kicker": "Weekly Setup",
+  "menu.title": "This Week's 4 Tacos",
+  "menu.sub": "Rename, reprice, or 86 a taco. Changes sync to every phone.",
+  "menu.on_menu": "On menu",
+  "menu.hidden": "Hidden · 86'd",
+  "menu.reset": "Reset service (clear orders)",
+  "menu.reset_confirm": "Reset the service? Clears all orders and restores the default menu.",
+};
+
+const DICTS: Record<Lang, Dict> = { es: ES, en: EN };
+
+type Ctx = {
+  lang: Lang;
+  setLang: (l: Lang) => void;
+  t: (key: keyof typeof ES, params?: Record<string, string | number>) => string;
+  money: (n: number) => string;
+  longDate: (d: Date) => string;
+};
+
+const I18nContext = createContext<Ctx | null>(null);
+
+function initialLang(): Lang {
+  try {
+    const saved = localStorage.getItem(LANG_KEY);
+    if (saved === "en" || saved === "es") return saved;
+  } catch {
+    /* ignore */
+  }
+  return "es";
+}
+
+export function I18nProvider({ children }: { children: ReactNode }) {
+  const [lang, setLangState] = useState<Lang>(initialLang);
+
+  const setLang = (l: Lang) => {
+    setLangState(l);
+    try {
+      localStorage.setItem(LANG_KEY, l);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const t = (key: string, params?: Record<string, string | number>) => {
+    const v = DICTS[lang][key] ?? key;
+    return typeof v === "function" ? v(params ?? {}) : v;
+  };
+
+  const value: Ctx = { lang, setLang, t, money: (n) => money(n, lang), longDate: (d) => longDate(d, lang) };
+  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
+}
+
+export function useI18n() {
+  const ctx = useContext(I18nContext);
+  if (!ctx) throw new Error("useI18n must be used within I18nProvider");
+  return ctx;
+}

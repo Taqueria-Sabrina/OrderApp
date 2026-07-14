@@ -1,0 +1,65 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Nunito", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Shrikhand", ui-serif, Georgia, serif;
+
+  /* Taqueria Sabrina brand */
+  --color-teal: #17b3ab;
+  --color-teal-dark: #0f8f88;
+  --color-teal-deep: #0b6d68;
+  --color-teal-soft: #e6f6f4;
+
+  --color-pink: #ef92c0;
+  --color-pink-deep: #c8437f;
+  --color-pink-soft: #fdeaf3;
+
+  --color-amber: #e79a3a;
+
+  --color-cream: #fff6f1;
+  --color-paper: #ffffff;
+  --color-ink: #33264a;
+  --color-ink-soft: #8a7d97;
+  --color-line: #f0e3ea;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-cream);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Retro chunky display, à la the Taqueria Sabrina wordmark.
+   Shrikhand ships a single weight (400) with its own built-in slant, so we
+   don't synthesize italic or heavier weights on top of it — that just distorts
+   the letterforms. The `font-black`/`italic` utilities used across the pages
+   are overridden here so the face renders as designed. */
+.font-display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-style: normal;
+  letter-spacing: 0;
+}
+
+/* Festive papel-picado top edge */
+.papel {
+  background-image: radial-gradient(circle at 10px -4px, transparent 9px, currentColor 10px);
+  background-size: 20px 16px;
+  background-repeat: repeat-x;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
