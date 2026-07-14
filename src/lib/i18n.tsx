@@ -33,9 +33,16 @@ const ES: Dict = {
   "board.today": "Hoy",
   "board.tagline": "Tacos veganos · hechos con cariño",
   "board.open": "Abierto ahora",
+  "board.closed": "Cerrado",
   "board.soldout": "Agotado",
   "board.none": "Hoy descansamos — vuelve pronto",
   "board.staff": "Entrar (equipo)",
+
+  "menu.storefront": "Escaparate",
+  "menu.open_label": "Abierto ahora",
+  "menu.open_sub": "Muestra “Abierto” u “Cerrado” en la web pública",
+  "menu.location_label": "Ubicación de hoy",
+  "menu.location_ph": "¿Dónde estamos hoy?",
 
   "login.title": "Trastienda",
   "login.sub": "Solo para el equipo de Sabrina",
@@ -140,9 +147,16 @@ const EN: Dict = {
   "board.today": "Today",
   "board.tagline": "Vegan tacos · made with love",
   "board.open": "Open now",
+  "board.closed": "Closed",
   "board.soldout": "Sold out",
   "board.none": "We're resting today — come back soon",
   "board.staff": "Staff sign in",
+
+  "menu.storefront": "Storefront",
+  "menu.open_label": "Open now",
+  "menu.open_sub": "Shows “Open” or “Closed” on the public site",
+  "menu.location_label": "Today's location",
+  "menu.location_ph": "Where are we today?",
 
   "login.title": "Back of House",
   "login.sub": "Sabrina crew only",

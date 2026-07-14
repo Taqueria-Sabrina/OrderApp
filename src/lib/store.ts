@@ -58,9 +58,11 @@ export type State = {
   orders: Order[];
   nextNumber: number;
   archives: Archive[]; // past closed-out services, newest first
+  open: boolean; // is the stand open right now (shown on the public board)
+  location: string; // where the stand is today (shown under the open badge)
 };
 
-const STORAGE_KEY = "popup-orders/v4";
+const STORAGE_KEY = "popup-orders/v5";
 const CHANNEL = "popup-orders";
 
 const DEFAULT_MENU: Taco[] = [
@@ -112,14 +114,16 @@ function seedArchives(): Archive[] {
   ];
 }
 
+const DEFAULT_LOCATION = "La Cocina Lot";
+
 function defaultState(): State {
-  return { menu: DEFAULT_MENU, orders: seedOrders(), nextNumber: 48, archives: seedArchives() };
+  return { menu: DEFAULT_MENU, orders: seedOrders(), nextNumber: 48, archives: seedArchives(), open: true, location: DEFAULT_LOCATION };
 }
 
 /** Cloud mode's starting snapshot before the DB hydrates — no fake seed data,
  *  just the default menu so the first paint isn't empty. */
 function emptyCloudState(): State {
-  return { menu: DEFAULT_MENU, orders: [], nextNumber: 1, archives: [] };
+  return { menu: DEFAULT_MENU, orders: [], nextNumber: 1, archives: [], open: true, location: DEFAULT_LOCATION };
 }
 
 function load(): State {
@@ -130,6 +134,8 @@ function load(): State {
     const parsed = JSON.parse(raw) as State;
     if (!parsed.menu || !parsed.orders) return fallback;
     if (!parsed.archives) parsed.archives = []; // forward-compat with pre-archive state
+    if (typeof parsed.open !== "boolean") parsed.open = true; // pre-open-flag state
+    if (typeof parsed.location !== "string") parsed.location = DEFAULT_LOCATION;
     return parsed;
   } catch {
     return fallback;
@@ -266,17 +272,29 @@ async function hydrateFromCloud() {
     })) ?? [];
   archives.sort((a, b) => b.closedAt - a.closedAt);
 
-  const app = appRes.data as { menu: Taco[]; next_number: number } | null;
+  const app = appRes.data as
+    | { menu: Taco[]; next_number: number; open?: boolean; location?: string }
+    | null;
 
   // First run against an empty DB: seed it with the default menu so the stand
   // has tacos to sell (orders/archives start empty in the cloud).
   if (!app) {
-    await supabase.from("app_state").insert({ id: 1, menu: DEFAULT_MENU, next_number: 1 });
-    setState({ menu: DEFAULT_MENU, orders: [], nextNumber: 1, archives: [] });
+    await supabase
+      .from("app_state")
+      .insert({ id: 1, menu: DEFAULT_MENU, next_number: 1, open: true, location: DEFAULT_LOCATION });
+    setState({ menu: DEFAULT_MENU, orders: [], nextNumber: 1, archives: [], open: true, location: DEFAULT_LOCATION });
     return;
   }
 
-  setState({ menu: app.menu, orders, nextNumber: app.next_number, archives });
+  setState({
+    menu: app.menu,
+    orders,
+    nextNumber: app.next_number,
+    archives,
+    // Columns may be absent on a row seeded before these fields existed.
+    open: app.open ?? true,
+    location: app.location ?? DEFAULT_LOCATION,
+  });
 }
 
 // A short debounce collapses bursts of realtime events (e.g. an insert + an
@@ -373,6 +391,22 @@ export function bumpOrder(id: string) {
   }
 }
 
+/** Toggle whether the stand is open (drives the public board's Open/Closed badge). */
+export function setOpen(open: boolean) {
+  setState({ ...state, open });
+  if (MODE === "cloud" && supabase) {
+    push(supabase.from("app_state").update({ open }).eq("id", 1));
+  }
+}
+
+/** Set today's location, shown under the Open badge on the public board. */
+export function setLocation(location: string) {
+  setState({ ...state, location });
+  if (MODE === "cloud" && supabase) {
+    push(supabase.from("app_state").update({ location }).eq("id", 1));
+  }
+}
+
 export function updateTaco(id: string, patch: Partial<Taco>) {
   const menu = state.menu.map((t) => (t.id === id ? { ...t, ...patch } : t));
   setState({ ...state, menu });
@@ -382,15 +416,15 @@ export function updateTaco(id: string, patch: Partial<Taco>) {
 }
 
 export function resetService() {
-  const fresh = MODE === "cloud"
-    ? { menu: DEFAULT_MENU, orders: [], nextNumber: 1, archives: [] }
+  const fresh: State = MODE === "cloud"
+    ? { menu: DEFAULT_MENU, orders: [], nextNumber: 1, archives: [], open: true, location: DEFAULT_LOCATION }
     : defaultState();
   setState(fresh);
   if (MODE === "cloud" && supabase) {
-    // Wipe orders + archives, restore the default menu.
+    // Wipe orders + archives, restore the default menu + settings.
     push(supabase.from("orders").delete().neq("id", ""));
     push(supabase.from("archives").delete().neq("id", ""));
-    push(supabase.from("app_state").update({ menu: DEFAULT_MENU, next_number: 1 }).eq("id", 1));
+    push(supabase.from("app_state").update({ menu: DEFAULT_MENU, next_number: 1, open: true, location: DEFAULT_LOCATION }).eq("id", 1));
   }
 }
 

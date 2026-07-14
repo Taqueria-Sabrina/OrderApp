@@ -1,4 +1,4 @@
-import { useStore, updateTaco, resetService } from "../lib/store";
+import { useStore, updateTaco, resetService, setOpen, setLocation } from "../lib/store";
 import { useI18n } from "../lib/i18n";
 
 function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
@@ -24,6 +24,33 @@ export default function Menu() {
         <h1 className="font-display text-3xl font-black text-ink">{t("menu.title")}</h1>
         <p className="mt-1 text-sm font-semibold text-ink-soft">{t("menu.sub")}</p>
       </header>
+
+      {/* Storefront controls — drive the public menu board */}
+      <div className="mb-4 px-5">
+        <div className="rounded-2xl border-2 border-teal-soft bg-paper p-4 shadow-sm">
+          <p className="mb-3 text-[11px] font-extrabold uppercase tracking-[0.2em] text-teal-deep">
+            {t("menu.storefront")}
+          </p>
+          <div className="flex items-center justify-between">
+            <div className="min-w-0">
+              <p className="font-display text-lg font-black text-ink">{t("menu.open_label")}</p>
+              <p className="text-[12px] text-ink-soft">{t("menu.open_sub")}</p>
+            </div>
+            <Toggle on={state.open} onClick={() => setOpen(!state.open)} />
+          </div>
+          <div className="mt-4">
+            <label className="mb-1 block text-xs font-extrabold uppercase tracking-wide text-ink-soft">
+              {t("menu.location_label")}
+            </label>
+            <input
+              value={state.location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder={t("menu.location_ph")}
+              className="w-full rounded-xl border-2 border-line bg-cream px-3 py-2.5 text-sm font-semibold text-ink placeholder:text-ink-soft focus:border-teal focus:outline-none"
+            />
+          </div>
+        </div>
+      </div>
 
       <div className="space-y-3 px-5">
         {state.menu.map((taco) => (

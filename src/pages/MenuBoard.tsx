@@ -31,11 +31,19 @@ export default function MenuBoard() {
         <header className="mb-8 flex flex-col items-center text-center">
           <Logo size="lg" />
           <p className="mt-4 text-sm font-bold text-ink-soft">{t("board.tagline")}</p>
-          {anyActive && (
-            <span className="mt-4 inline-flex items-center gap-2 rounded-full bg-teal-soft px-4 py-1.5 text-xs font-extrabold uppercase tracking-wide text-teal-deep">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-teal" />
-              {t("board.open")}
-            </span>
+          {/* Open / Closed badge — toggled by staff on the back-office menu editor */}
+          <span
+            className="mt-4 inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-extrabold uppercase tracking-wide"
+            style={{
+              backgroundColor: state.open ? "#e6f6f4" : "#f0e3ea",
+              color: state.open ? "#0b6d68" : "#8a7d97",
+            }}
+          >
+            {state.open && <span className="h-2 w-2 animate-pulse rounded-full bg-teal" />}
+            {state.open ? t("board.open") : t("board.closed")}
+          </span>
+          {state.open && state.location.trim() && (
+            <p className="mt-2 text-sm font-bold text-ink">{state.location}</p>
           )}
         </header>
 
