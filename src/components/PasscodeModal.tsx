@@ -24,9 +24,9 @@ export default function PasscodeModal({
   const [code, setCode] = useState("");
   const [error, setError] = useState(false);
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!verifyPasscode(code)) {
+    if (!(await verifyPasscode(code))) {
       setError(true);
       return;
     }

@@ -9,16 +9,17 @@ export default function Login() {
   const { t } = useI18n();
   const navigate = useNavigate();
   const location = useLocation();
-  const [code, setCode] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState(false);
 
   const dest = (location.state as { from?: string } | null)?.from ?? "/app";
   // Already signed in? Skip straight to the app.
   if (authed) return <Navigate to={dest} replace />;
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (login(code)) {
+    if (await login(username, password)) {
       navigate(dest, { replace: true });
     } else {
       setError(true);
@@ -40,14 +41,26 @@ export default function Login() {
 
           <input
             autoFocus
-            type="password"
-            value={code}
+            type="text"
+            autoComplete="username"
+            value={username}
             onChange={(e) => {
-              setCode(e.target.value);
+              setUsername(e.target.value);
+              setError(false);
+            }}
+            placeholder={t("login.user_ph")}
+            className="w-full rounded-xl border-2 border-line bg-cream px-4 py-3 text-base font-semibold text-ink placeholder:text-ink-soft focus:border-teal focus:outline-none"
+          />
+          <input
+            type="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => {
+              setPassword(e.target.value);
               setError(false);
             }}
             placeholder={t("login.ph")}
-            className="w-full rounded-xl border-2 border-line bg-cream px-4 py-3 text-base font-semibold text-ink placeholder:text-ink-soft focus:border-teal focus:outline-none"
+            className="mt-3 w-full rounded-xl border-2 border-line bg-cream px-4 py-3 text-base font-semibold text-ink placeholder:text-ink-soft focus:border-teal focus:outline-none"
           />
           {error && <p className="mt-2 text-sm font-bold text-pink-deep">{t("login.error")}</p>}
 

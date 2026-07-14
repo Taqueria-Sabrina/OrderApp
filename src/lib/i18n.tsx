@@ -47,7 +47,8 @@ const ES: Dict = {
 
   "login.title": "Trastienda",
   "login.sub": "Solo para el equipo de Sabrina",
-  "login.ph": "Código del equipo",
+  "login.user_ph": "Usuario",
+  "login.ph": "Contraseña",
   "login.enter": "Entrar",
   "login.error": "Código incorrecto",
   "login.public": "← Ver el menú público",
@@ -165,7 +166,8 @@ const EN: Dict = {
 
   "login.title": "Back of House",
   "login.sub": "Sabrina crew only",
-  "login.ph": "Crew passcode",
+  "login.user_ph": "Username",
+  "login.ph": "Password",
   "login.enter": "Enter",
   "login.error": "Wrong passcode",
   "login.public": "← View public menu",

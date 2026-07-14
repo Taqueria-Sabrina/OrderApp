@@ -2,28 +2,51 @@ import { createContext, useContext, useState, type ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 
 /**
- * Lightweight staff gate for the back-of-house app.
+ * Staff gate for the back-of-house app.
  *
- * The public menu board (`/`) is open to anyone; everything under `/app` is
- * behind a shared crew passcode. This is a prototype-grade gate — the session
- * flag lives in localStorage and the passcode is checked client-side. In
- * production this would be a real auth provider, but the surface (login form +
- * RequireAuth wrapper) wouldn't change.
+ * The public menu board (`/`) is open; everything under `/app` requires a staff
+ * login (username + password). Credentials are NOT stored in plaintext — only
+ * their SHA-256 hashes live in the source, so the literal password never
+ * appears in the repo or the shipped bundle.
+ *
+ * Honest limitation: this is a static site with no backend, so verification
+ * happens in the browser. Hashing defeats casual "grep the source" theft, but a
+ * determined attacker could still bypass a client-side gate. For real security,
+ * move to Supabase Auth (server-verified sessions + row-level policies).
  */
 
 const AUTH_KEY = "popup-orders/staff-auth";
-// Shared crew passcode. Swap for real auth in production.
-const PASSCODE = "sabrina";
 
-/** Check a passcode without changing session state — used to gate destructive
- *  actions (e.g. closing out the day) behind a re-entry of the crew passcode. */
-export function verifyPasscode(code: string): boolean {
-  return code.trim().toLowerCase() === PASSCODE;
+// SHA-256 hashes (hex). Plaintext lives only in the operators' heads.
+// - CREDENTIAL_HASH: sha256("<username>:<password>"), case-sensitive.
+// - PASSWORD_HASH: sha256("<password>"), used to re-confirm destructive actions.
+const CREDENTIAL_HASH = "3ef6f858bd8979fafae9e59c49b0a25fc98604f6c189f1ed8454aaa9663d4539";
+const PASSWORD_HASH = "a9c92dc7a265d1610c1a9529cac0795c98cb6f6d7eaf9b3c75358921e97a4e49";
+
+async function sha256Hex(input: string): Promise<string> {
+  const bytes = new TextEncoder().encode(input);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+/** Verify a username + password pair against the stored credential hash. */
+export async function verifyCredentials(username: string, password: string): Promise<boolean> {
+  const hash = await sha256Hex(`${username.trim()}:${password}`);
+  return hash === CREDENTIAL_HASH;
+}
+
+/** Verify just the password — used to re-confirm destructive actions (close out
+ *  the day, delete an order/archive) without re-entering the username. */
+export async function verifyPasscode(password: string): Promise<boolean> {
+  const hash = await sha256Hex(password);
+  return hash === PASSWORD_HASH;
 }
 
 type Ctx = {
   authed: boolean;
-  login: (code: string) => boolean;
+  login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
 };
 
@@ -40,8 +63,8 @@ function initialAuthed(): boolean {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [authed, setAuthed] = useState<boolean>(initialAuthed);
 
-  const login = (code: string) => {
-    if (code.trim().toLowerCase() !== PASSCODE) return false;
+  const login = async (username: string, password: string) => {
+    if (!(await verifyCredentials(username, password))) return false;
     setAuthed(true);
     try {
       localStorage.setItem(AUTH_KEY, "1");
