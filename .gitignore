@@ -29,3 +29,10 @@ tempo/.tempo/
 tempo/node_modules/
 tempo/dist/
 .tempo/
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example
