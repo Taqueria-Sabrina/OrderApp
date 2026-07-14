@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { useStore } from "../lib/store";
 import { useI18n } from "../lib/i18n";
 import LangToggle from "../components/LangToggle";
+import Logo from "../components/Logo";
 
 /**
  * Public storefront — no auth. Shows this week's tacos live (sold-out state
@@ -26,15 +27,10 @@ export default function MenuBoard() {
           <LangToggle />
         </div>
 
-        {/* Wordmark / hero */}
-        <header className="mb-8 text-center">
-          <h1 className="font-display text-6xl font-black leading-[0.9] text-pink-deep">
-            Taqueria
-            <br />
-            Sabrina
-          </h1>
-          <div className="mt-2 text-4xl" aria-hidden>✨🐩</div>
-          <p className="mt-3 text-sm font-bold text-ink-soft">{t("board.tagline")}</p>
+        {/* Logo / hero */}
+        <header className="mb-8 flex flex-col items-center text-center">
+          <Logo size="lg" />
+          <p className="mt-4 text-sm font-bold text-ink-soft">{t("board.tagline")}</p>
           {anyActive && (
             <span className="mt-4 inline-flex items-center gap-2 rounded-full bg-teal-soft px-4 py-1.5 text-xs font-extrabold uppercase tracking-wide text-teal-deep">
               <span className="h-2 w-2 animate-pulse rounded-full bg-teal" />
@@ -55,7 +51,7 @@ export default function MenuBoard() {
                   opacity: taco.active ? 1 : 0.55,
                 }}
               >
-                <span className="text-4xl">{taco.emoji}</span>
+                <span className="h-12 w-2 shrink-0 rounded-full" style={{ backgroundColor: taco.tint }} />
                 <div className="min-w-0 flex-1">
                   <h2 className="font-display text-2xl font-black leading-tight text-ink">{taco.name}</h2>
                   <p className="mt-0.5 text-[13px] leading-snug text-ink-soft">{taco.note}</p>

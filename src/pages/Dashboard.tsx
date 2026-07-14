@@ -99,7 +99,7 @@ function ArchiveRow({ archive }: { archive: Archive }) {
         <div>
           <p className="font-display text-lg font-black text-ink">{longDate(new Date(archive.closedAt))}</p>
           <p className="text-xs font-semibold text-ink-soft">
-            {t("dash.past_orders", { n: archive.orders.length })} · {totalSold} 🌮
+            {t("dash.past_orders", { n: archive.orders.length })} · {t("dash.tacos_sold", { n: totalSold })}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -118,7 +118,7 @@ function ArchiveRow({ archive }: { archive: Archive }) {
             return (
               <div key={taco.id} className="flex items-center justify-between text-sm font-bold text-ink">
                 <span className="flex items-center gap-2">
-                  <span>{taco.emoji}</span>
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: taco.tint }} />
                   {taco.name}
                 </span>
                 <span className="tabular-nums text-ink-soft">{n} ×</span>
@@ -132,7 +132,7 @@ function ArchiveRow({ archive }: { archive: Archive }) {
             onClick={() => setConfirmDelete(true)}
             className="mt-2 text-xs font-extrabold uppercase tracking-wide text-pink-deep underline underline-offset-4"
           >
-            🗑 {t("dash.del")}
+            {t("dash.del")}
           </button>
         </div>
       )}
@@ -203,7 +203,7 @@ export default function Dashboard() {
               <div key={taco.id}>
                 <div className="mb-1.5 flex items-center justify-between">
                   <span className="flex items-center gap-2 text-sm font-bold text-ink">
-                    <span className="text-lg">{taco.emoji}</span>
+                    <span className="h-3 w-3 rounded-full" style={{ backgroundColor: taco.tint }} />
                     {taco.name}
                     {!taco.active && <span className="text-[10px] font-extrabold uppercase text-ink-soft">{t("dash.off")}</span>}
                   </span>
@@ -246,7 +246,7 @@ export default function Dashboard() {
         disabled={orders === 0}
         className="mt-8 w-full rounded-2xl border-2 border-pink-deep py-3.5 text-sm font-black uppercase tracking-wide text-pink-deep transition active:scale-[0.98] disabled:opacity-40"
       >
-        🔒 {t("dash.close_day")}
+        {t("dash.close_day")}
       </button>
       <p className="mt-2 text-center text-xs font-semibold text-ink-soft">{t("dash.close_day_sub")}</p>
 

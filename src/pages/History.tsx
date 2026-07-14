@@ -37,7 +37,7 @@ function Row({ order }: { order: Order }) {
       </div>
 
       {order.note && (
-        <p className="mt-2 rounded bg-pink-soft px-2 py-1 text-xs font-bold text-pink-deep">⚑ {order.note}</p>
+        <p className="mt-2 rounded bg-pink-soft px-2 py-1 text-xs font-bold text-pink-deep">{order.note}</p>
       )}
 
       <span

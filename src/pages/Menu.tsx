@@ -34,7 +34,7 @@ export default function Menu() {
           >
             <div className="flex items-start justify-between gap-3">
               <div className="flex min-w-0 flex-1 items-start gap-2">
-                <span className="text-2xl">{taco.emoji}</span>
+                <span className="mt-1 h-7 w-7 shrink-0 rounded-xl" style={{ backgroundColor: taco.tint }} />
                 <div className="min-w-0 flex-1">
                   <input
                     value={taco.name}

@@ -1,7 +1,6 @@
 import { Link } from "react-router-dom";
 import { useStore, revenue, soldCounts } from "../lib/store";
 import { useI18n } from "../lib/i18n";
-import Wordmark from "../components/Wordmark";
 
 export default function Home() {
   const state = useStore();
@@ -21,10 +20,7 @@ export default function Home() {
 
   return (
     <div className="flex min-h-full flex-col px-5 pb-8 pt-6">
-      <header className="mb-2">
-        <Wordmark />
-      </header>
-      <p className="mb-6 text-sm font-semibold text-ink-soft">{t("home.subtitle")}</p>
+      <p className="mb-6 mt-2 text-sm font-semibold text-ink-soft">{t("home.subtitle")}</p>
 
       <div className="mb-6 grid grid-cols-3 gap-3">
         {[
@@ -57,8 +53,9 @@ export default function Home() {
         <p className="mb-2 text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">{t("home.on_menu")}</p>
         <div className="flex flex-wrap gap-2">
           {active.map((taco) => (
-            <span key={taco.id} className="rounded-full bg-teal-soft px-3 py-1 text-sm font-bold text-teal-deep">
-              {taco.emoji} {taco.name}
+            <span key={taco.id} className="flex items-center gap-2 rounded-full bg-teal-soft px-3 py-1 text-sm font-bold text-teal-deep">
+              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: taco.tint }} />
+              {taco.name}
             </span>
           ))}
         </div>

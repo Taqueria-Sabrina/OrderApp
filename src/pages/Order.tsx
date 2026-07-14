@@ -66,7 +66,7 @@ export default function Order() {
                   {c}
                 </span>
               )}
-              <span className="text-4xl">{taco.emoji}</span>
+              <span className="h-10 w-10 rounded-2xl" style={{ backgroundColor: taco.tint }} />
               <div className="mt-3">
                 <p className="font-display text-lg font-black leading-tight text-ink">{taco.name}</p>
                 <p className="mt-0.5 text-[11px] leading-tight text-ink-soft">{taco.note}</p>

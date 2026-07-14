@@ -35,7 +35,7 @@ function Card({ order, accent, now }: { order: Order; accent: string; now: numbe
         ))}
       </ul>
       {order.note && (
-        <p className="mt-2 rounded bg-pink-soft px-2 py-1 text-xs font-bold text-pink-deep">⚑ {order.note}</p>
+        <p className="mt-2 rounded bg-pink-soft px-2 py-1 text-xs font-bold text-pink-deep">{order.note}</p>
       )}
       <button
         onClick={() => (isReady ? bumpOrder(order.id) : advanceOrder(order.id))}

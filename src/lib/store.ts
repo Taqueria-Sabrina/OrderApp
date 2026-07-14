@@ -1,22 +1,33 @@
 import { useSyncExternalStore } from "react";
+import { supabase, isSupabaseConfigured } from "./supabase";
 
 /**
  * Shared, realtime state for the pop-up order board.
  *
- * State is persisted to localStorage and broadcast across every open tab /
- * phone (same browser origin) over a BroadcastChannel, so an order fired on one
- * device shows up on all the others within a frame. In production this same
- * shape would sit behind a websocket / hosted realtime DB; the store API below
- * wouldn't change.
+ * Two sync backends, chosen at startup by whether Supabase is configured:
+ *
+ * - **cloud** (Supabase set) — orders/archives/menu live in Postgres, one row
+ *   per order. Every device subscribes to realtime changes, so an order fired
+ *   on the counter phone shows up on the kitchen screen (a SEPARATE device)
+ *   within a moment. Writes are optimistic locally, then pushed to the DB;
+ *   localStorage is just an offline cache for instant first paint.
+ *
+ * - **local** (no Supabase) — falls back to same-origin BroadcastChannel +
+ *   storage-event sync (same browser only). Used for local dev and the Tempo
+ *   canvas sidecar, which don't have env vars.
+ *
+ * The store's public API (useStore + the action/selector exports) is identical
+ * in both modes, so the pages never change.
  */
+
+const MODE: "cloud" | "local" = isSupabaseConfigured ? "cloud" : "local";
 
 export type Taco = {
   id: string;
   name: string;
   note: string;
   price: number;
-  emoji: string;
-  tint: string;
+  tint: string; // brand color that stands in for the taco visually
   active: boolean;
 };
 
@@ -53,10 +64,10 @@ const STORAGE_KEY = "popup-orders/v4";
 const CHANNEL = "popup-orders";
 
 const DEFAULT_MENU: Taco[] = [
-  { id: "tortillero", name: "Tortillero", note: "tortilla de papas, chimichurri y crujiente de maíz", price: 3, emoji: "🥔", tint: "#17b3ab", active: true },
-  { id: "adobada", name: "Adobada", note: "soja en chile guajillo y pasilla, salsa verde y cebolla", price: 3, emoji: "🌶️", tint: "#c8437f", active: true },
-  { id: "tinga", name: "Tinga", note: "soja en chipotle, crema y lechuga crujiente", price: 3, emoji: "🌮", tint: "#ef92c0", active: true },
-  { id: "bbq", name: "BBQ", note: "Heura en salsa barbacoa casera, dulce y picante", price: 3, emoji: "🍖", tint: "#e79a3a", active: true },
+  { id: "tortillero", name: "Tortillero", note: "tortilla de papas, chimichurri y crujiente de maíz", price: 3, tint: "#17b3ab", active: true },
+  { id: "adobada", name: "Adobada", note: "soja en chile guajillo y pasilla, salsa verde y cebolla", price: 3, tint: "#c8437f", active: true },
+  { id: "tinga", name: "Tinga", note: "soja en chipotle, crema y lechuga crujiente", price: 3, tint: "#ef92c0", active: true },
+  { id: "bbq", name: "BBQ", note: "Heura en salsa barbacoa casera, dulce y picante", price: 3, tint: "#e79a3a", active: true },
 ];
 
 function seedOrders(): Order[] {
@@ -105,16 +116,23 @@ function defaultState(): State {
   return { menu: DEFAULT_MENU, orders: seedOrders(), nextNumber: 48, archives: seedArchives() };
 }
 
+/** Cloud mode's starting snapshot before the DB hydrates — no fake seed data,
+ *  just the default menu so the first paint isn't empty. */
+function emptyCloudState(): State {
+  return { menu: DEFAULT_MENU, orders: [], nextNumber: 1, archives: [] };
+}
+
 function load(): State {
+  const fallback = MODE === "cloud" ? emptyCloudState() : defaultState();
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return defaultState();
+    if (!raw) return fallback;
     const parsed = JSON.parse(raw) as State;
-    if (!parsed.menu || !parsed.orders) return defaultState();
+    if (!parsed.menu || !parsed.orders) return fallback;
     if (!parsed.archives) parsed.archives = []; // forward-compat with pre-archive state
     return parsed;
   } catch {
-    return defaultState();
+    return fallback;
   }
 }
 
@@ -122,45 +140,53 @@ let state: State = load();
 const listeners = new Set<() => void>();
 
 const channel: BroadcastChannel | null =
-  typeof BroadcastChannel !== "undefined" ? new BroadcastChannel(CHANNEL) : null;
+  MODE === "local" && typeof BroadcastChannel !== "undefined" ? new BroadcastChannel(CHANNEL) : null;
 
 function emit() {
   for (const l of listeners) l();
 }
 
-function persist(broadcast: boolean) {
+function cache() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch {
     /* ignore quota errors in prototype */
   }
-  if (broadcast) channel?.postMessage(state);
-  emit();
 }
 
-function setState(next: State, broadcast = true) {
+/**
+ * Apply a new state locally: update the in-memory snapshot, cache it, notify
+ * React. In LOCAL mode we also broadcast to sibling tabs. In CLOUD mode we do
+ * NOT broadcast — the DB write + realtime subscription fans the change out to
+ * every device (including this one, idempotently).
+ */
+function setState(next: State) {
   state = next;
-  persist(broadcast);
+  cache();
+  if (MODE === "local") channel?.postMessage(state);
+  emit();
 }
 
-// Receive updates from other tabs/devices.
-channel?.addEventListener("message", (e: MessageEvent<State>) => {
-  state = e.data;
-  emit();
-});
-
-// Fallback sync for browsers without BroadcastChannel (storage event).
-if (typeof window !== "undefined") {
-  window.addEventListener("storage", (e) => {
-    if (e.key === STORAGE_KEY && e.newValue) {
-      try {
-        state = JSON.parse(e.newValue) as State;
-        emit();
-      } catch {
-        /* ignore */
-      }
-    }
+if (MODE === "local") {
+  // Receive updates from other tabs on this device.
+  channel?.addEventListener("message", (e: MessageEvent<State>) => {
+    state = e.data;
+    emit();
   });
+
+  // Fallback sync for browsers without BroadcastChannel (storage event).
+  if (typeof window !== "undefined") {
+    window.addEventListener("storage", (e) => {
+      if (e.key === STORAGE_KEY && e.newValue) {
+        try {
+          state = JSON.parse(e.newValue) as State;
+          emit();
+        } catch {
+          /* ignore */
+        }
+      }
+    });
+  }
 }
 
 function subscribe(cb: () => void) {
@@ -176,7 +202,117 @@ export function useStore(): State {
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
+// ---- Cloud backend (Supabase) ----
+//
+// Row shapes mirror the SQL schema (see README / the setup snippet). Timestamps
+// are stored as epoch-ms bigints to match the existing `createdAt` fields.
+
+type OrderRow = {
+  id: string;
+  number: number;
+  name: string;
+  items: Record<string, number>;
+  note: string;
+  status: OrderStatus;
+  created_at: number;
+  completed_at: number | null;
+};
+
+type ArchiveRow = { id: string; closed_at: number; orders: Order[] };
+
+function orderToRow(o: Order): OrderRow {
+  return {
+    id: o.id,
+    number: o.number,
+    name: o.name,
+    items: o.items,
+    note: o.note,
+    status: o.status,
+    created_at: o.createdAt,
+    completed_at: o.completedAt ?? null,
+  };
+}
+
+function rowToOrder(r: OrderRow): Order {
+  return {
+    id: r.id,
+    number: r.number,
+    name: r.name,
+    items: r.items,
+    note: r.note,
+    status: r.status,
+    createdAt: r.created_at,
+    completedAt: r.completed_at ?? undefined,
+  };
+}
+
+/** Pull the full state from Supabase and hydrate the local snapshot. */
+async function hydrateFromCloud() {
+  if (!supabase) return;
+  const [ordersRes, archivesRes, appRes] = await Promise.all([
+    supabase.from("orders").select("*"),
+    supabase.from("archives").select("*"),
+    supabase.from("app_state").select("*").eq("id", 1).maybeSingle(),
+  ]);
+
+  const orders = (ordersRes.data as OrderRow[] | null)?.map(rowToOrder) ?? [];
+  orders.sort((a, b) => a.createdAt - b.createdAt);
+
+  const archives =
+    (archivesRes.data as ArchiveRow[] | null)?.map((r) => ({
+      id: r.id,
+      closedAt: r.closed_at,
+      orders: r.orders,
+    })) ?? [];
+  archives.sort((a, b) => b.closedAt - a.closedAt);
+
+  const app = appRes.data as { menu: Taco[]; next_number: number } | null;
+
+  // First run against an empty DB: seed it with the default menu so the stand
+  // has tacos to sell (orders/archives start empty in the cloud).
+  if (!app) {
+    await supabase.from("app_state").insert({ id: 1, menu: DEFAULT_MENU, next_number: 1 });
+    setState({ menu: DEFAULT_MENU, orders: [], nextNumber: 1, archives: [] });
+    return;
+  }
+
+  setState({ menu: app.menu, orders, nextNumber: app.next_number, archives });
+}
+
+// A short debounce collapses bursts of realtime events (e.g. an insert + an
+// app_state update from the same action) into a single refetch.
+let refetchTimer: ReturnType<typeof setTimeout> | null = null;
+function scheduleRefetch() {
+  if (refetchTimer) clearTimeout(refetchTimer);
+  refetchTimer = setTimeout(() => {
+    refetchTimer = null;
+    void hydrateFromCloud();
+  }, 120);
+}
+
+if (MODE === "cloud" && supabase) {
+  void hydrateFromCloud();
+  // One channel covering all three tables; any change triggers a refetch so the
+  // local snapshot converges to the DB across every device.
+  supabase
+    .channel("popup-orders-db")
+    .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, scheduleRefetch)
+    .on("postgres_changes", { event: "*", schema: "public", table: "archives" }, scheduleRefetch)
+    .on("postgres_changes", { event: "*", schema: "public", table: "app_state" }, scheduleRefetch)
+    .subscribe();
+}
+
+/** Fire-and-forget a Supabase write; log failures without breaking the UI. */
+function push(p: PromiseLike<{ error: unknown }>) {
+  Promise.resolve(p).then(({ error }) => {
+    if (error) console.error("[store] Supabase write failed:", error);
+  });
+}
+
 // ---- Actions ----
+//
+// Each action applies an optimistic local update (instant UI), then in cloud
+// mode pushes the change to Supabase. Realtime reconciles all devices after.
 
 function uid() {
   return `${Date.now().toString(36)}-${Math.floor(Math.random() * 1e6).toString(36)}`;
@@ -195,19 +331,21 @@ export function fireOrder(items: Record<string, number>, note: string, name = ""
     status: "new",
     createdAt: Date.now(),
   };
-  setState({ ...state, orders: [...state.orders, order], nextNumber: state.nextNumber + 1 });
+  const nextNumber = state.nextNumber + 1;
+  setState({ ...state, orders: [...state.orders, order], nextNumber });
+  if (MODE === "cloud" && supabase) {
+    push(supabase.from("orders").insert(orderToRow(order)));
+    push(supabase.from("app_state").update({ next_number: nextNumber }).eq("id", 1));
+  }
 }
 
 export function advanceOrder(id: string) {
   const flow: OrderStatus[] = ["new", "cooking", "ready"];
-  setState({
-    ...state,
-    orders: state.orders.map((o) => {
-      if (o.id !== id) return o;
-      const i = flow.indexOf(o.status);
-      return { ...o, status: flow[Math.min(i + 1, flow.length - 1)] };
-    }),
-  });
+  const current = state.orders.find((o) => o.id === id);
+  if (!current) return;
+  const i = flow.indexOf(current.status);
+  const status = flow[Math.min(i + 1, flow.length - 1)];
+  setOrderStatus(id, status);
 }
 
 export function setOrderStatus(id: string, status: OrderStatus) {
@@ -215,25 +353,45 @@ export function setOrderStatus(id: string, status: OrderStatus) {
     ...state,
     orders: state.orders.map((o) => (o.id === id ? { ...o, status } : o)),
   });
+  if (MODE === "cloud" && supabase) {
+    push(supabase.from("orders").update({ status }).eq("id", id));
+  }
 }
 
 export function bumpOrder(id: string) {
   // Archive a picked-up ticket: it leaves the live queue but stays in the
   // order log so it still counts toward sales and shows up in history.
+  const completedAt = Date.now();
   setState({
     ...state,
     orders: state.orders.map((o) =>
-      o.id === id ? { ...o, status: "done", completedAt: Date.now() } : o,
+      o.id === id ? { ...o, status: "done", completedAt } : o,
     ),
   });
+  if (MODE === "cloud" && supabase) {
+    push(supabase.from("orders").update({ status: "done", completed_at: completedAt }).eq("id", id));
+  }
 }
 
 export function updateTaco(id: string, patch: Partial<Taco>) {
-  setState({ ...state, menu: state.menu.map((t) => (t.id === id ? { ...t, ...patch } : t)) });
+  const menu = state.menu.map((t) => (t.id === id ? { ...t, ...patch } : t));
+  setState({ ...state, menu });
+  if (MODE === "cloud" && supabase) {
+    push(supabase.from("app_state").update({ menu }).eq("id", 1));
+  }
 }
 
 export function resetService() {
-  setState(defaultState());
+  const fresh = MODE === "cloud"
+    ? { menu: DEFAULT_MENU, orders: [], nextNumber: 1, archives: [] }
+    : defaultState();
+  setState(fresh);
+  if (MODE === "cloud" && supabase) {
+    // Wipe orders + archives, restore the default menu.
+    push(supabase.from("orders").delete().neq("id", ""));
+    push(supabase.from("archives").delete().neq("id", ""));
+    push(supabase.from("app_state").update({ menu: DEFAULT_MENU, next_number: 1 }).eq("id", 1));
+  }
 }
 
 /**
@@ -251,11 +409,19 @@ export function closeOutDay() {
     nextNumber: 1,
     archives: [archive, ...state.archives],
   });
+  if (MODE === "cloud" && supabase) {
+    push(supabase.from("archives").insert({ id: archive.id, closed_at: archive.closedAt, orders: archive.orders }));
+    push(supabase.from("orders").delete().neq("id", ""));
+    push(supabase.from("app_state").update({ next_number: 1 }).eq("id", 1));
+  }
 }
 
 /** Permanently remove one archived service (e.g. to clear a test run). */
 export function deleteArchive(id: string) {
   setState({ ...state, archives: state.archives.filter((a) => a.id !== id) });
+  if (MODE === "cloud" && supabase) {
+    push(supabase.from("archives").delete().eq("id", id));
+  }
 }
 
 // ---- Selectors ----

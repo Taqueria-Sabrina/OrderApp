@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, Navigate, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { useI18n } from "../lib/i18n";
+import Logo from "../components/Logo";
 
 export default function Login() {
   const { authed, login } = useAuth();
@@ -27,11 +28,10 @@ export default function Login() {
   return (
     <div className="flex min-h-full flex-col items-center justify-center bg-cream px-6">
       <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <Link to="/" className="font-display text-3xl font-black leading-tight text-pink-deep">
-            Taqueria Sabrina
+        <div className="mb-8 flex justify-center">
+          <Link to="/">
+            <Logo size="md" />
           </Link>
-          <div className="mt-1 text-2xl" aria-hidden>✨🐩</div>
         </div>
 
         <form onSubmit={submit} className="rounded-3xl border border-line bg-paper p-6 shadow-sm">

@@ -3,6 +3,7 @@ import { useI18n } from "../lib/i18n";
 import { useAuth } from "../lib/auth";
 import LangToggle from "./LangToggle";
 import LiveBadge from "./LiveBadge";
+import Logo from "./Logo";
 
 const NAV = [
   { to: "/app/order", key: "nav.order" as const, icon: "＋" },
@@ -21,8 +22,8 @@ export default function Layout() {
       <div className="papel h-4 shrink-0 text-teal" />
       {/* Global top bar: brand · live status · language */}
       <div className="flex shrink-0 items-center justify-between border-b border-line bg-cream px-4 py-2">
-        <Link to="/app" className="font-display text-lg font-black italic leading-none text-pink-deep">
-          Sabrina <span aria-hidden>🐩</span>
+        <Link to="/app">
+          <Logo size="sm" />
         </Link>
         <div className="flex items-center gap-2">
           <LiveBadge />
