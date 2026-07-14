@@ -80,3 +80,21 @@ The app seeds the default menu into `app_state` automatically on first load.
 > key, so anyone with the publishable key could read/write. That's fine for a
 > pop-up prototype. Before this handles real customer data at scale, add
 > Supabase Auth + per-user row policies.
+
+## Hosting & domain
+
+- **GitHub Pages** builds and hosts the static site from `main` via
+  `.github/workflows/deploy.yml` (with the Supabase env baked in). Pages serves
+  it under the project path: `https://taqueria-sabrina.github.io/OrderApp/`.
+- **taqueriasabrina.com** is the public front door, served through a
+  **Cloudflare Worker** (source: [`cloudflare-worker.js`](./cloudflare-worker.js)).
+  The build uses `base="/"` for clean URLs; the worker fetches the Pages origin
+  with the `/OrderApp` prefix prepended, so the browser only ever sees clean
+  root paths (`/`, `/assets/...`, `/app/queue`).
+- After changing `cloudflare-worker.js`, paste it into the Cloudflare dashboard
+  worker (Workers & Pages → the worker on `taqueriasabrina.com/*` → Edit code →
+  Deploy) and Purge Everything once. HTML is served `no-store` so future
+  deploys don't get stuck behind stale cache.
+- **Note:** because the build now uses `base="/"`, the raw
+  `github.io/OrderApp/` URL no longer works standalone (its assets resolve at
+  the domain root). Use taqueriasabrina.com — that's the intended entry point.
