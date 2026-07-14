@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { useStore, menuById, advanceOrder, bumpOrder, type Order, type OrderStatus } from "../lib/store";
+import { useStore, menuById, advanceOrder, bumpOrder, deleteOrder, type Order, type OrderStatus } from "../lib/store";
 import { useI18n } from "../lib/i18n";
+import PasscodeModal from "../components/PasscodeModal";
 
 const LANES: { status: OrderStatus; key: "queue.new" | "queue.cooking" | "queue.ready"; accent: string }[] = [
   { status: "new", key: "queue.new", accent: "#c8437f" },
@@ -13,6 +14,7 @@ function Card({ order, accent, now }: { order: Order; accent: string; now: numbe
   const { t } = useI18n();
   const byId = menuById(state);
   const isReady = order.status === "ready";
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const secs = Math.max(0, Math.floor((now - order.createdAt) / 1000));
   const timeLabel = secs < 60 ? t("queue.now") : t("queue.min_ago", { m: Math.floor(secs / 60) });
@@ -44,6 +46,22 @@ function Card({ order, accent, now }: { order: Order; accent: string; now: numbe
       >
         {order.status === "new" ? t("queue.start") : order.status === "cooking" ? t("queue.mark_ready") : t("queue.clear")}
       </button>
+      <button
+        onClick={() => setConfirmDelete(true)}
+        className="mt-2 w-full text-center text-[11px] font-extrabold uppercase tracking-wide text-ink-soft underline underline-offset-4"
+      >
+        {t("order.del")}
+      </button>
+
+      {confirmDelete && (
+        <PasscodeModal
+          title={t("order.del")}
+          prompt={t("order.del_confirm", { n: order.number })}
+          confirmLabel={t("order.del_go")}
+          onConfirm={() => deleteOrder(order.id)}
+          onClose={() => setConfirmDelete(false)}
+        />
+      )}
     </div>
   );
 }

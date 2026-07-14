@@ -43,6 +43,7 @@ const ES: Dict = {
   "menu.open_sub": "Muestra “Abierto” u “Cerrado” en la web pública",
   "menu.location_label": "Ubicación de hoy",
   "menu.location_ph": "¿Dónde estamos hoy?",
+  "menu.heat": "Picante",
 
   "login.title": "Trastienda",
   "login.sub": "Solo para el equipo de Sabrina",
@@ -96,6 +97,9 @@ const ES: Dict = {
   "queue.empty": "Nada por aquí",
   "queue.now": "ahora",
   "queue.min_ago": ({ m }) => `hace ${m} min`,
+  "order.del": "Eliminar pedido",
+  "order.del_confirm": ({ n }) => `Introduce el código para eliminar el pedido #${n}. Se descuenta de las ventas del día.`,
+  "order.del_go": "Eliminar pedido",
 
   "dash.kicker": "Cocina · Trastienda",
   "dash.title": "Números de Hoy",
@@ -157,6 +161,7 @@ const EN: Dict = {
   "menu.open_sub": "Shows “Open” or “Closed” on the public site",
   "menu.location_label": "Today's location",
   "menu.location_ph": "Where are we today?",
+  "menu.heat": "Heat",
 
   "login.title": "Back of House",
   "login.sub": "Sabrina crew only",
@@ -210,6 +215,9 @@ const EN: Dict = {
   "queue.empty": "Nothing here",
   "queue.now": "just now",
   "queue.min_ago": ({ m }) => `${m} min ago`,
+  "order.del": "Delete order",
+  "order.del_confirm": ({ n }) => `Enter the passcode to delete order #${n}. Its total is backed out of today's sales.`,
+  "order.del_go": "Delete order",
 
   "dash.kicker": "Back of House",
   "dash.title": "Tonight's Numbers",

@@ -1,5 +1,6 @@
 import { useStore, updateTaco, resetService, setOpen, setLocation } from "../lib/store";
 import { useI18n } from "../lib/i18n";
+import { ChilliPicker } from "../components/Chilli";
 
 function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
   return (
@@ -77,7 +78,7 @@ export default function Menu() {
               </div>
               <Toggle on={taco.active} onClick={() => updateTaco(taco.id, { active: !taco.active })} />
             </div>
-            <div className="mt-3 flex items-center gap-2">
+            <div className="mt-3 flex items-center gap-3">
               <div className="flex items-center rounded-xl bg-cream px-3 py-2">
                 <input
                   type="number"
@@ -88,9 +89,10 @@ export default function Menu() {
                 />
                 <span className="text-lg font-black text-ink-soft">€</span>
               </div>
-              <span className="text-xs font-extrabold uppercase tracking-wide text-ink-soft">
-                {taco.active ? t("menu.on_menu") : t("menu.hidden")}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-extrabold uppercase tracking-wide text-ink-soft">{t("menu.heat")}</span>
+                <ChilliPicker value={taco.heat} onChange={(v) => updateTaco(taco.id, { heat: v })} />
+              </div>
             </div>
           </div>
         ))}

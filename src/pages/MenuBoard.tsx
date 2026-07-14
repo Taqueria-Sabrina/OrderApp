@@ -3,6 +3,7 @@ import { useStore } from "../lib/store";
 import { useI18n } from "../lib/i18n";
 import LangToggle from "../components/LangToggle";
 import Logo from "../components/Logo";
+import Chillis from "../components/Chilli";
 
 /**
  * Public storefront — no auth. Shows this week's tacos live (sold-out state
@@ -61,7 +62,10 @@ export default function MenuBoard() {
               >
                 <span className="h-12 w-2 shrink-0 rounded-full" style={{ backgroundColor: taco.tint }} />
                 <div className="min-w-0 flex-1">
-                  <h2 className="font-display text-2xl font-black leading-tight text-ink">{taco.name}</h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="font-display text-2xl font-black leading-tight text-ink">{taco.name}</h2>
+                    <Chillis level={taco.heat} size={18} />
+                  </div>
                   <p className="mt-0.5 text-[13px] leading-snug text-ink-soft">{taco.note}</p>
                 </div>
                 {taco.active ? (

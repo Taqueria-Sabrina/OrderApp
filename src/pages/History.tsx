@@ -1,5 +1,7 @@
-import { useStore, menuById, orderQty, orderTotal, type Order } from "../lib/store";
+import { useState } from "react";
+import { useStore, menuById, orderQty, orderTotal, deleteOrder, type Order } from "../lib/store";
 import { useI18n } from "../lib/i18n";
+import PasscodeModal from "../components/PasscodeModal";
 
 function timeOf(ms: number, lang: string) {
   return new Intl.DateTimeFormat(lang === "en" ? "en-GB" : "es-ES", {
@@ -13,6 +15,7 @@ function Row({ order }: { order: Order }) {
   const { t, money, lang } = useI18n();
   const byId = menuById(state);
   const done = order.status === "done";
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   return (
     <div className="rounded-2xl border border-line bg-paper p-4 shadow-sm">
@@ -40,15 +43,33 @@ function Row({ order }: { order: Order }) {
         <p className="mt-2 rounded bg-pink-soft px-2 py-1 text-xs font-bold text-pink-deep">{order.note}</p>
       )}
 
-      <span
-        className="mt-2 inline-block rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide"
-        style={{
-          backgroundColor: done ? "#e6f6f4" : "#fdeaf3",
-          color: done ? "#0b6d68" : "#c8437f",
-        }}
-      >
-        {done ? t("hist.done") : t("hist.active")}
-      </span>
+      <div className="mt-2 flex items-center justify-between">
+        <span
+          className="inline-block rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide"
+          style={{
+            backgroundColor: done ? "#e6f6f4" : "#fdeaf3",
+            color: done ? "#0b6d68" : "#c8437f",
+          }}
+        >
+          {done ? t("hist.done") : t("hist.active")}
+        </span>
+        <button
+          onClick={() => setConfirmDelete(true)}
+          className="text-[11px] font-extrabold uppercase tracking-wide text-ink-soft underline underline-offset-4"
+        >
+          {t("order.del")}
+        </button>
+      </div>
+
+      {confirmDelete && (
+        <PasscodeModal
+          title={t("order.del")}
+          prompt={t("order.del_confirm", { n: order.number })}
+          confirmLabel={t("order.del_go")}
+          onConfirm={() => deleteOrder(order.id)}
+          onClose={() => setConfirmDelete(false)}
+        />
+      )}
     </div>
   );
 }

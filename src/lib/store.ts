@@ -28,6 +28,7 @@ export type Taco = {
   note: string;
   price: number;
   tint: string; // brand color that stands in for the taco visually
+  heat: number; // chilli rating 0–3, shown on the public board
   active: boolean;
 };
 
@@ -66,10 +67,10 @@ const STORAGE_KEY = "popup-orders/v5";
 const CHANNEL = "popup-orders";
 
 const DEFAULT_MENU: Taco[] = [
-  { id: "tortillero", name: "Tortillero", note: "tortilla de papas, chimichurri y crujiente de maíz", price: 3, tint: "#17b3ab", active: true },
-  { id: "adobada", name: "Adobada", note: "soja en chile guajillo y pasilla, salsa verde y cebolla", price: 3, tint: "#c8437f", active: true },
-  { id: "tinga", name: "Tinga", note: "soja en chipotle, crema y lechuga crujiente", price: 3, tint: "#ef92c0", active: true },
-  { id: "bbq", name: "BBQ", note: "Heura en salsa barbacoa casera, dulce y picante", price: 3, tint: "#e79a3a", active: true },
+  { id: "tortillero", name: "Tortillero", note: "tortilla de papas, chimichurri y crujiente de maíz", price: 3, tint: "#17b3ab", heat: 0, active: true },
+  { id: "adobada", name: "Adobada", note: "soja en chile guajillo y pasilla, salsa verde y cebolla", price: 3, tint: "#c8437f", heat: 2, active: true },
+  { id: "tinga", name: "Tinga", note: "soja en chipotle, crema y lechuga crujiente", price: 3, tint: "#ef92c0", heat: 1, active: true },
+  { id: "bbq", name: "BBQ", note: "Heura en salsa barbacoa casera, dulce y picante", price: 3, tint: "#e79a3a", heat: 2, active: true },
 ];
 
 function seedOrders(): Order[] {
@@ -126,6 +127,11 @@ function emptyCloudState(): State {
   return { menu: DEFAULT_MENU, orders: [], nextNumber: 1, archives: [], open: true, location: DEFAULT_LOCATION };
 }
 
+/** Ensure every taco has a heat rating (0–3), for menus saved before the field. */
+function normalizeMenu(menu: Taco[]): Taco[] {
+  return menu.map((t) => ({ ...t, heat: typeof t.heat === "number" ? t.heat : 0 }));
+}
+
 function load(): State {
   const fallback = MODE === "cloud" ? emptyCloudState() : defaultState();
   try {
@@ -136,6 +142,7 @@ function load(): State {
     if (!parsed.archives) parsed.archives = []; // forward-compat with pre-archive state
     if (typeof parsed.open !== "boolean") parsed.open = true; // pre-open-flag state
     if (typeof parsed.location !== "string") parsed.location = DEFAULT_LOCATION;
+    parsed.menu = normalizeMenu(parsed.menu);
     return parsed;
   } catch {
     return fallback;
@@ -287,7 +294,7 @@ async function hydrateFromCloud() {
   }
 
   setState({
-    menu: app.menu,
+    menu: normalizeMenu(app.menu),
     orders,
     nextNumber: app.next_number,
     archives,
@@ -388,6 +395,19 @@ export function bumpOrder(id: string) {
   });
   if (MODE === "cloud" && supabase) {
     push(supabase.from("orders").update({ status: "done", completed_at: completedAt }).eq("id", id));
+  }
+}
+
+/**
+ * Permanently delete an order (mistake / cancellation) from anywhere on the
+ * line — new, cooking, ready, or already picked up. Because revenue and sold
+ * counts are derived from the orders list, removing the order automatically
+ * backs its total out of the day's sales. Password-gated in the UI.
+ */
+export function deleteOrder(id: string) {
+  setState({ ...state, orders: state.orders.filter((o) => o.id !== id) });
+  if (MODE === "cloud" && supabase) {
+    push(supabase.from("orders").delete().eq("id", id));
   }
 }
 
