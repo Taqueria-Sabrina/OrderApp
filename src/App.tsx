@@ -11,8 +11,11 @@ import Menu from "./pages/Menu";
 import History from "./pages/History";
 
 export default function App() {
+  // Vite injects BASE_URL ("/OrderApp/" in the Pages build, "/" in dev). Strip
+  // the trailing slash so react-router serves every route under the subpath.
+  const basename = import.meta.env.BASE_URL.replace(/\/$/, "");
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={basename}>
       <Routes>
         {/* Public, no-auth storefront */}
         <Route path="/" element={<MenuBoard />} />

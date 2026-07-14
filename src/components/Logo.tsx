@@ -13,9 +13,12 @@ export default function Logo({
   size?: "sm" | "md" | "lg";
 }) {
   const h = size === "lg" ? "h-28" : size === "sm" ? "h-8" : "h-14";
+  // Prefix with Vite's BASE_URL so the asset resolves under the Pages subpath
+  // (/OrderApp/logo.png) as well as at the root in dev.
+  const src = `${import.meta.env.BASE_URL}logo.png`;
   return (
     <img
-      src="/logo.png"
+      src={src}
       alt="Taqueria Sabrina"
       className={`${h} w-auto object-contain ${className}`}
     />
