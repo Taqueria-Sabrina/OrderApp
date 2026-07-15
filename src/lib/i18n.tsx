@@ -37,7 +37,7 @@ const ES: Dict = {
   "board.soldout": "Agotado",
   "board.none": "Hoy descansamos — vuelve pronto",
   "board.next_event": "Próximo evento",
-  "board.other": "Varios",
+  "board.other": "Especiales",
   "board.event_today": "Hoy.",
   "board.at": "en",
   "board.ig_follow": "Síguenos en Instagram",
