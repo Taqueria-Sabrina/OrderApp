@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useStore, fireOrder, dealPrice, listTotal } from "../lib/store";
+import { useStore, fireOrder, dealPrice, tacoCountOf, alaCarteTotalOf, tacoListTotal } from "../lib/store";
 import { useI18n } from "../lib/i18n";
 
 export default function Order() {
@@ -18,8 +18,10 @@ export default function Order() {
     setQty((q) => ({ ...q, [id]: Math.max(0, (q[id] ?? 0) + delta) }));
 
   const items = menu.reduce((s, taco) => s + (qty[taco.id] ?? 0), 0);
-  const total = dealPrice(items);
-  const savings = listTotal(state, qty) - total;
+  // Tacos share the bundle deal; non-taco items are added a la carte.
+  const tacoQty = tacoCountOf(qty, state.menu);
+  const total = dealPrice(tacoQty) + alaCarteTotalOf(qty, state.menu);
+  const savings = tacoListTotal(qty, state.menu) - dealPrice(tacoQty);
 
   const fire = () => {
     fireOrder(qty, note, name);
@@ -114,7 +116,7 @@ export default function Order() {
         </div>
         <div className="mb-3 flex items-end justify-between">
           <div>
-            <span className="text-sm font-semibold text-ink-soft">{t("order.tacos", { n: items })}</span>
+            <span className="text-sm font-semibold text-ink-soft">{t("order.tacos", { n: tacoQty })}</span>
             {savings > 0 && (
               <span className="ml-2 rounded-full bg-teal-soft px-2 py-0.5 text-[11px] font-black text-teal-deep">
                 {t("order.save", { amt: money(savings) })}

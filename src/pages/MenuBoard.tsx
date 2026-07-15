@@ -55,21 +55,24 @@ export default function MenuBoard() {
               {hours && <p className="text-sm font-bold text-ink-soft">{hours}</p>}
             </div>
           ) : (
-            // CLOSED: next event (date @ location, or "Today.") + hours
-            <div className="mt-3 text-center">
-              <p className="text-[11px] font-extrabold uppercase tracking-[0.2em] text-pink-deep">
-                {t("board.next_event")}
-              </p>
-              <p className="mt-1 font-display text-xl font-black text-ink">
-                {isToday ? t("board.event_today") : eventDateObj ? longDate(eventDateObj) : location}
-              </p>
-              {(isToday || eventDateObj) && location && (
-                <p className="text-sm font-bold text-ink-soft">
-                  {t("board.at")} {location}
+            // CLOSED: show a "Next event" block only when a date OR location is
+            // set — otherwise nothing (avoids advertising a stale/empty event).
+            (state.eventDate || location) && (
+              <div className="mt-3 text-center">
+                <p className="text-[11px] font-extrabold uppercase tracking-[0.2em] text-pink-deep">
+                  {t("board.next_event")}
                 </p>
-              )}
-              {hours && <p className="mt-0.5 text-sm font-bold text-ink-soft">{hours}</p>}
-            </div>
+                <p className="mt-1 font-display text-xl font-black text-ink">
+                  {isToday ? t("board.event_today") : eventDateObj ? longDate(eventDateObj) : location}
+                </p>
+                {(isToday || eventDateObj) && location && (
+                  <p className="text-sm font-bold text-ink-soft">
+                    {t("board.at")} {location}
+                  </p>
+                )}
+                {hours && <p className="mt-0.5 text-sm font-bold text-ink-soft">{hours}</p>}
+              </div>
+            )
           )}
         </header>
 

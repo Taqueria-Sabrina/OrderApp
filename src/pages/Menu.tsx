@@ -1,4 +1,5 @@
-import { useStore, updateTaco, resetService, setOpen, setLocation, setSchedule } from "../lib/store";
+import { useState } from "react";
+import { useStore, updateTaco, resetService, setOpen, setLocation, setSchedule, addMenuItem, removeMenuItem } from "../lib/store";
 import { useI18n } from "../lib/i18n";
 import { ChilliPicker } from "../components/Chilli";
 
@@ -18,6 +19,44 @@ function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
     >
       <span className="h-6 w-6 rounded-full bg-white shadow" />
     </button>
+  );
+}
+
+function AddItem() {
+  const { t } = useI18n();
+  const [name, setName] = useState("");
+  const [isTaco, setIsTaco] = useState(true);
+
+  const add = () => {
+    if (!name.trim()) return;
+    addMenuItem(name, isTaco);
+    setName("");
+    setIsTaco(true);
+  };
+
+  return (
+    <div className="rounded-2xl border-2 border-dashed border-line bg-paper p-4 shadow-sm">
+      <p className="mb-3 text-[11px] font-extrabold uppercase tracking-[0.2em] text-teal-deep">{t("menu.add_title")}</p>
+      <input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && add()}
+        placeholder={t("menu.add_ph")}
+        className="w-full rounded-xl border-2 border-line bg-cream px-3 py-2.5 text-sm font-semibold text-ink placeholder:text-ink-soft focus:border-teal focus:outline-none"
+      />
+      <div className="mt-3 flex items-center gap-2">
+        <Toggle on={isTaco} onClick={() => setIsTaco((v) => !v)} />
+        <span className="text-[13px] font-bold text-ink-soft">{t("menu.add_is_taco")}</span>
+      </div>
+      <button
+        onClick={add}
+        disabled={!name.trim()}
+        className="mt-3 w-full rounded-2xl py-3 text-sm font-black uppercase tracking-wide text-white transition active:scale-[0.98] disabled:opacity-40"
+        style={{ backgroundColor: "#17b3ab" }}
+      >
+        {t("menu.add_btn")}
+      </button>
+    </div>
   );
 }
 
@@ -66,7 +105,7 @@ export default function Menu() {
               type="date"
               value={state.eventDate}
               onChange={(e) => setSchedule({ eventDate: e.target.value })}
-              className="w-full rounded-xl border-2 border-line bg-cream px-3 py-2.5 text-sm font-semibold text-ink focus:border-teal focus:outline-none"
+              className="block w-full min-w-0 max-w-full appearance-none box-border rounded-xl border-2 border-line bg-cream px-3 py-2.5 text-sm font-semibold text-ink focus:border-teal focus:outline-none"
             />
           </div>
 
@@ -143,8 +182,27 @@ export default function Menu() {
                 <ChilliPicker value={taco.heat} onChange={(v) => updateTaco(taco.id, { heat: v })} />
               </div>
             </div>
+            <div className="mt-3 flex items-center justify-between border-t border-line pt-3">
+              <div className="flex items-center gap-2">
+                <Toggle on={taco.isTaco} onClick={() => updateTaco(taco.id, { isTaco: !taco.isTaco })} />
+                <span className="text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">
+                  {taco.isTaco ? `${t("menu.taco")} · ${t("menu.taco_hint")}` : t("menu.taco")}
+                </span>
+              </div>
+              <button
+                onClick={() => removeMenuItem(taco.id)}
+                className="text-[11px] font-extrabold uppercase tracking-wide text-pink-deep underline underline-offset-4"
+              >
+                {t("menu.remove")}
+              </button>
+            </div>
           </div>
         ))}
+      </div>
+
+      {/* Add a new item */}
+      <div className="mt-4 px-5">
+        <AddItem />
       </div>
 
       <div className="mt-auto px-5 pb-8 pt-6">

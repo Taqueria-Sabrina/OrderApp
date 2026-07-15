@@ -22,13 +22,16 @@ import { supabase, isSupabaseConfigured } from "./supabase";
 
 const MODE: "cloud" | "local" = isSupabaseConfigured ? "cloud" : "local";
 
+// A menu item. isTaco items share the 1×3/2×5/3×7 bundle deal; non-taco items
+// (drinks, sides, …) are priced a la carte at their own price.
 export type Taco = {
   id: string;
   name: string;
   note: string;
   price: number;
-  tint: string; // brand color that stands in for the taco visually
+  tint: string; // brand color that stands in for the item visually
   heat: number; // chilli rating 0–3, shown on the public board
+  isTaco: boolean; // in the taco bundle deal? (false = a la carte)
   active: boolean;
 };
 
@@ -70,10 +73,10 @@ const STORAGE_KEY = "popup-orders/v5";
 const CHANNEL = "popup-orders";
 
 const DEFAULT_MENU: Taco[] = [
-  { id: "tortillero", name: "Tortillero", note: "tortilla de papas, chimichurri y crujiente de maíz", price: 3, tint: "#17b3ab", heat: 0, active: true },
-  { id: "adobada", name: "Adobada", note: "soja en chile guajillo y pasilla, salsa verde y cebolla", price: 3, tint: "#c8437f", heat: 2, active: true },
-  { id: "tinga", name: "Tinga", note: "soja en chipotle, crema y lechuga crujiente", price: 3, tint: "#ef92c0", heat: 1, active: true },
-  { id: "bbq", name: "BBQ", note: "Heura en salsa barbacoa casera, dulce y picante", price: 3, tint: "#e79a3a", heat: 2, active: true },
+  { id: "tortillero", name: "Tortillero", note: "tortilla de papas, chimichurri y crujiente de maíz", price: 3, tint: "#17b3ab", heat: 0, isTaco: true, active: true },
+  { id: "adobada", name: "Adobada", note: "soja en chile guajillo y pasilla, salsa verde y cebolla", price: 3, tint: "#c8437f", heat: 2, isTaco: true, active: true },
+  { id: "tinga", name: "Tinga", note: "soja en chipotle, crema y lechuga crujiente", price: 3, tint: "#ef92c0", heat: 1, isTaco: true, active: true },
+  { id: "bbq", name: "BBQ", note: "Heura en salsa barbacoa casera, dulce y picante", price: 3, tint: "#e79a3a", heat: 2, isTaco: true, active: true },
 ];
 
 function seedOrders(): Order[] {
@@ -131,9 +134,13 @@ function emptyCloudState(): State {
   return { menu: DEFAULT_MENU, orders: [], nextNumber: 1, archives: [], ...STOREFRONT_DEFAULTS };
 }
 
-/** Ensure every taco has a heat rating (0–3), for menus saved before the field. */
+/** Backfill fields on menus saved before they existed (heat, isTaco). */
 function normalizeMenu(menu: Taco[]): Taco[] {
-  return menu.map((t) => ({ ...t, heat: typeof t.heat === "number" ? t.heat : 0 }));
+  return menu.map((t) => ({
+    ...t,
+    heat: typeof t.heat === "number" ? t.heat : 0,
+    isTaco: typeof t.isTaco === "boolean" ? t.isTaco : true,
+  }));
 }
 
 function load(): State {
@@ -472,6 +479,39 @@ export function updateTaco(id: string, patch: Partial<Taco>) {
   }
 }
 
+// Brand palette cycled through for new items' color swatch.
+const ITEM_TINTS = ["#17b3ab", "#c8437f", "#ef92c0", "#e79a3a", "#0f8f88"];
+
+/** Add a new menu item. `isTaco` decides whether it joins the bundle deal. */
+export function addMenuItem(name: string, isTaco: boolean) {
+  const clean = name.trim();
+  if (!clean) return;
+  const item: Taco = {
+    id: `item-${uid()}`,
+    name: clean,
+    note: "",
+    price: 3,
+    tint: ITEM_TINTS[state.menu.length % ITEM_TINTS.length],
+    heat: 0,
+    isTaco,
+    active: true,
+  };
+  const menu = [...state.menu, item];
+  setState({ ...state, menu });
+  if (MODE === "cloud" && supabase) {
+    push(supabase.from("app_state").update({ menu }).eq("id", 1));
+  }
+}
+
+/** Remove a menu item (e.g. one added by mistake). */
+export function removeMenuItem(id: string) {
+  const menu = state.menu.filter((t) => t.id !== id);
+  setState({ ...state, menu });
+  if (MODE === "cloud" && supabase) {
+    push(supabase.from("app_state").update({ menu }).eq("id", 1));
+  }
+}
+
 export function resetService() {
   const fresh: State = MODE === "cloud"
     ? { menu: DEFAULT_MENU, orders: [], nextNumber: 1, archives: [], ...STOREFRONT_DEFAULTS }
@@ -570,43 +610,73 @@ export function orderQty(order: Order): number {
   return Object.values(order.items).reduce((a, b) => a + b, 0);
 }
 
-export function orderTotal(order: Order): number {
-  return dealPrice(orderQty(order));
+/** How many of an order's items are tacos (the ones in the bundle deal). */
+export function tacoCountOf(items: Record<string, number>, menu: Taco[]): number {
+  const byId = Object.fromEntries(menu.map((t) => [t.id, t]));
+  let n = 0;
+  for (const [id, qty] of Object.entries(items)) if (byId[id]?.isTaco ?? true) n += qty;
+  return n;
 }
 
-/** A-la-carte value at the per-taco list price (used to show the savings). */
-export function listTotal(state: State, items: Record<string, number>): number {
-  const byId = menuById(state);
+/** Sum of a la carte (non-taco) items at their own price. */
+export function alaCarteTotalOf(items: Record<string, number>, menu: Taco[]): number {
+  const byId = Object.fromEntries(menu.map((t) => [t.id, t]));
   let total = 0;
-  for (const [id, qty] of Object.entries(items)) total += (byId[id]?.price ?? 0) * qty;
+  for (const [id, qty] of Object.entries(items)) {
+    const item = byId[id];
+    if (item && !item.isTaco) total += item.price * qty;
+  }
   return total;
 }
 
-export function revenueOf(orders: Order[]) {
-  return orders.reduce((sum, o) => sum + orderTotal(o), 0);
+/** Order total = taco bundle price (by taco count) + a la carte items. */
+export function orderTotal(order: Order, menu: Taco[]): number {
+  return dealPrice(tacoCountOf(order.items, menu)) + alaCarteTotalOf(order.items, menu);
+}
+
+/** A-la-carte value of the TACO items at their individual price (for the
+ *  "you save" badge — only tacos have deal savings). */
+export function tacoListTotal(items: Record<string, number>, menu: Taco[]): number {
+  const byId = Object.fromEntries(menu.map((t) => [t.id, t]));
+  let total = 0;
+  for (const [id, qty] of Object.entries(items)) {
+    const item = byId[id];
+    if (item && item.isTaco) total += item.price * qty;
+  }
+  return total;
+}
+
+export function revenueOf(orders: Order[], menu: Taco[]) {
+  return orders.reduce((sum, o) => sum + orderTotal(o, menu), 0);
 }
 
 export function revenue(state: State) {
-  return revenueOf(state.orders);
+  return revenueOf(state.orders, state.menu);
 }
 
-/** Actual revenue attributed to each taco, splitting each order's deal price
- *  across its tacos in proportion to quantity (so the parts sum to revenue). */
-export function revenueByTacoOf(orders: Order[]) {
+/** Revenue attributed to each item so the parts sum to total revenue: taco
+ *  items split their order's bundle price by taco-quantity share; non-taco
+ *  items get their own price × qty. */
+export function revenueByTacoOf(orders: Order[], menu: Taco[]) {
+  const byId = Object.fromEntries(menu.map((t) => [t.id, t]));
   const out: Record<string, number> = {};
   for (const o of orders) {
-    const q = orderQty(o);
-    if (q === 0) continue;
-    const total = orderTotal(o);
+    const tacoQ = tacoCountOf(o.items, menu);
+    const dealPart = dealPrice(tacoQ);
     for (const [id, n] of Object.entries(o.items)) {
-      out[id] = (out[id] ?? 0) + total * (n / q);
+      const item = byId[id];
+      if (item && !item.isTaco) {
+        out[id] = (out[id] ?? 0) + item.price * n;
+      } else if (tacoQ > 0) {
+        out[id] = (out[id] ?? 0) + dealPart * (n / tacoQ);
+      }
     }
   }
   return out;
 }
 
 export function revenueByTaco(state: State) {
-  return revenueByTacoOf(state.orders);
+  return revenueByTacoOf(state.orders, state.menu);
 }
 
 // ---- Storefront schedule helpers ----

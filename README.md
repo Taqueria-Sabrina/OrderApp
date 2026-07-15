@@ -1,25 +1,23 @@
 # Taqueria Sabrina — Order App
 
 A mobile-first realtime order board for the Taqueria Sabrina pop-up. Vite + React
-+ TypeScript + Tailwind v4.
+
+- TypeScript + Tailwind v4.
 
 - **Public menu board** at `/` — live menu, no login.
-- **Staff back-of-house** at `/app/*` (passcode-gated): order entry, kitchen
-  queue, sales dashboard, order history, weekly archives, menu editor.
+
+- **Staff back-of-house** at `/app/*` (passcode-gated): order entry, kitchen queue, sales dashboard, order history, weekly archives, menu editor.
 
 ## Realtime sync (Supabase)
 
-Orders sync live across **separate devices** (the counter phone and the kitchen
-screen) via Supabase Postgres + realtime subscriptions. Credentials live in
-`.env.local` (gitignored):
+Orders sync live across **separate devices** (the counter phone and the kitchen screen) via Supabase Postgres + realtime subscriptions. Credentials live in `.env.local` (gitignored):
 
 ```
 VITE_SUPABASE_URL=https://<project>.supabase.co
 VITE_SUPABASE_ANON_KEY=<publishable / anon key>
 ```
 
-If those are absent, the app falls back to **same-device-only** sync
-(BroadcastChannel) so local dev and the Tempo canvas still work.
+If those are absent, the app falls back to **same-device-only** sync (BroadcastChannel) so local dev and the Tempo canvas still work.
 
 ### One-time database setup
 
@@ -82,7 +80,4 @@ alter publication supabase_realtime add table app_state;
 
 The app seeds the default menu into `app_state` automatically on first load.
 
-> **Security note (prototype):** RLS is on but policies are open to the anon
-> key, so anyone with the publishable key could read/write. That's fine for a
-> pop-up prototype. Before this handles real customer data at scale, add
-> Supabase Auth + per-user row policies.
+> **Security note (prototype):** RLS is on but policies are open to the anon key, so anyone with the publishable key could read/write. That's fine for a pop-up prototype. Before this handles real customer data at scale, add Supabase Auth + per-user row policies.

@@ -20,7 +20,7 @@ function ArchiveRow({ archive }: { archive: Archive }) {
   const [open, setOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const sold = soldCountsOf(archive.orders);
-  const rev = revenueOf(archive.orders);
+  const rev = revenueOf(archive.orders, state.menu);
   const totalSold = Object.values(sold).reduce((a, b) => a + b, 0);
 
   return (

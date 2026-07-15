@@ -25,7 +25,7 @@ function Row({ order }: { order: Order }) {
           <span className="text-sm font-bold text-ink">{order.name || t("order.noname")}</span>
         </div>
         <div className="text-right">
-          <span className="font-display text-lg font-black text-pink-deep">{money(orderTotal(order))}</span>
+          <span className="font-display text-lg font-black text-pink-deep">{money(orderTotal(order, state.menu))}</span>
           <p className="text-[11px] font-semibold text-ink-soft">{timeOf(order.completedAt ?? order.createdAt, lang)}</p>
         </div>
       </div>
