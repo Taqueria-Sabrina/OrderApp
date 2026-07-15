@@ -193,7 +193,15 @@ export default function Menu() {
           >
             <div className="flex items-start justify-between gap-3">
               <div className="flex min-w-0 flex-1 items-start gap-2">
-                <span className="mt-1 h-7 w-7 shrink-0 rounded-xl" style={{ backgroundColor: taco.tint }} />
+                <input
+                  type="color"
+                  value={taco.tint}
+                  onChange={(e) => updateTaco(taco.id, { tint: e.target.value })}
+                  aria-label={t("menu.color")}
+                  title={t("menu.color")}
+                  className="mt-1 h-7 w-7 shrink-0 cursor-pointer appearance-none rounded-xl border-0 bg-transparent p-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:rounded-lg [&::-webkit-color-swatch]:border-0 [&::-moz-color-swatch]:rounded-lg [&::-moz-color-swatch]:border-0"
+                  style={{ backgroundColor: taco.tint }}
+                />
                 <div className="min-w-0 flex-1">
                   <input
                     value={taco.name}
