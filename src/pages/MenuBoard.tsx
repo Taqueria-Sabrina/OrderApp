@@ -1,5 +1,6 @@
+import { useEffect } from "react";
 import { Link } from "react-router-dom";
-import { useLiveBoard, eventIsToday, hoursLabel, parseEventDate, type Taco } from "../lib/store";
+import { useLiveBoard, eventIsToday, hoursLabel, parseEventDate, recordVisit, startBoardPresence, stopBoardPresence, type Taco } from "../lib/store";
 import { useI18n } from "../lib/i18n";
 import LangToggle from "../components/LangToggle";
 import Logo from "../components/Logo";
@@ -42,6 +43,17 @@ export default function MenuBoard() {
   // Always the LIVE board (app_state id 1) — never demo data, even on a demo device.
   const state = useLiveBoard();
   const { t, money, longDate } = useI18n();
+
+  // Analytics: count the visit (once per device) and join the live-visitor
+  // presence channel while this public page is open.
+  useEffect(() => {
+    void recordVisit();
+    startBoardPresence(true);
+    return () => {
+      void stopBoardPresence();
+    };
+  }, []);
+
   const today = longDate(new Date());
   const anyActive = state.menu.some((taco) => taco.active);
   const tacos = state.menu.filter((m) => m.isTaco);

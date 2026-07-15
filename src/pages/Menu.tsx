@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useStore, updateTaco, resetService, setOpen, setLocation, setSchedule, addMenuItem, removeMenuItem, isDemo, useDemoControl, setDemoEnabled, bootDemo } from "../lib/store";
+import { useState, useEffect } from "react";
+import { useStore, updateTaco, resetService, setOpen, setLocation, setSchedule, addMenuItem, removeMenuItem, isDemo, useDemoControl, setDemoEnabled, bootDemo, startBoardPresence, stopBoardPresence, fetchVisitsTotal } from "../lib/store";
 import { useI18n } from "../lib/i18n";
 import { ChilliPicker } from "../components/Chilli";
 
@@ -62,15 +62,39 @@ function AddItem() {
 
 function Settings() {
   const { t } = useI18n();
-  const { demoEnabled, demoCount, staffCount } = useDemoControl();
+  const { demoEnabled, demoCount, staffCount, visitors, visitsTotal } = useDemoControl();
   const demoActive = demoCount > 0;
+
+  // Homepage analytics: observe live visitors + load the all-time total.
+  useEffect(() => {
+    void fetchVisitsTotal();
+    startBoardPresence(false); // observe only — don't count Leo as a visitor
+    return () => {
+      void stopBoardPresence();
+    };
+  }, []);
 
   return (
     <div className="rounded-2xl border-2 border-line bg-paper p-4 shadow-sm">
       <p className="mb-3 text-[11px] font-extrabold uppercase tracking-[0.2em] text-teal-deep">{t("menu.settings_title")}</p>
 
+      {/* Homepage analytics */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="rounded-xl bg-cream p-3 text-center">
+          <p className="font-display text-3xl font-black tabular-nums text-ink">{visitsTotal}</p>
+          <p className="text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">{t("menu.visits_total")}</p>
+        </div>
+        <div className="rounded-xl bg-cream p-3 text-center">
+          <p className="flex items-center justify-center gap-2 font-display text-3xl font-black tabular-nums text-teal-deep">
+            <span className={`h-2.5 w-2.5 rounded-full bg-teal ${visitors > 0 ? "animate-pulse" : ""}`} />
+            {visitors}
+          </p>
+          <p className="text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">{t("menu.visitors_now")}</p>
+        </div>
+      </div>
+
       {/* Staff (Leo account) connected devices */}
-      <div className="flex items-center gap-2">
+      <div className="mt-4 flex items-center gap-2 border-t border-line pt-4">
         <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-teal" />
         <span className="text-[13px] font-bold text-ink-soft">{t("menu.staff_connected", { n: staffCount })}</span>
       </div>

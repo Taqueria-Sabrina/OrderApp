@@ -292,8 +292,15 @@ export function useLiveBoard(): BoardSnapshot {
 // `demoCount` is how many demo devices are currently connected (presence).
 // `kicked` flips true on a demo device when the live backend boots it.
 
-type Control = { demoEnabled: boolean; demoCount: number; kicked: boolean; staffCount: number };
-let control: Control = { demoEnabled: true, demoCount: 0, kicked: false, staffCount: 0 };
+type Control = {
+  demoEnabled: boolean;
+  demoCount: number;
+  kicked: boolean;
+  staffCount: number;
+  visitors: number; // active visitors on the public board right now (presence)
+  visitsTotal: number; // all-time unique-device visits (visits table)
+};
+let control: Control = { demoEnabled: true, demoCount: 0, kicked: false, staffCount: 0, visitors: 0, visitsTotal: 0 };
 const controlListeners = new Set<() => void>();
 function setControl(patch: Partial<Control>) {
   control = { ...control, ...patch };
@@ -578,6 +585,56 @@ export async function leaveStaffPresence() {
   staffPresence = null;
   await ch.untrack();
   await supabase.removeChannel(ch);
+}
+
+// ---- Homepage analytics (Leo backend only) ----
+//
+// Active visitors = presence on the public board channel (the MenuBoard TRACKS,
+// the Settings panel just OBSERVES). Total visits = rows in the `visits` table,
+// inserted once per device. Within a single tab only one of MenuBoard/Settings
+// is mounted, so the board channel is either tracking or observing, never both.
+let boardPresence: RealtimeChannel | null = null;
+
+export function startBoardPresence(track: boolean) {
+  if (boardPresence || MODE !== "cloud" || !supabase) return;
+  const key = `${Date.now().toString(36)}-${Math.floor(Math.random() * 1e6).toString(36)}`;
+  boardPresence = supabase.channel("board-presence", { config: { presence: { key } } });
+  boardPresence
+    .on("presence", { event: "sync" }, () => {
+      if (boardPresence) setControl({ visitors: Object.keys(boardPresence.presenceState()).length });
+    })
+    .subscribe((status) => {
+      if (status === "SUBSCRIBED" && track) void boardPresence?.track({ at: Date.now() });
+    });
+}
+
+export async function stopBoardPresence() {
+  if (!boardPresence || !supabase) return;
+  const ch = boardPresence;
+  boardPresence = null;
+  await ch.untrack();
+  await supabase.removeChannel(ch);
+}
+
+const VISITED_KEY = "popup-orders/visited";
+
+/** Record a homepage visit once per device (public board mount). */
+export async function recordVisit() {
+  if (MODE !== "cloud" || !supabase) return;
+  try {
+    if (localStorage.getItem(VISITED_KEY)) return;
+    localStorage.setItem(VISITED_KEY, "1");
+  } catch {
+    /* ignore */
+  }
+  push(supabase.from("visits").insert({}));
+}
+
+/** Fetch the all-time visit total into control (Leo Settings panel). */
+export async function fetchVisitsTotal() {
+  if (!supabase) return;
+  const { count } = await supabase.from("visits").select("*", { count: "exact", head: true });
+  setControl({ visitsTotal: count ?? 0 });
 }
 
 /** Is demo access currently enabled? (read live app_state id 1) */

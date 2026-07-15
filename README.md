@@ -49,6 +49,13 @@ create table if not exists archives (
 );
 alter table archives add column if not exists env text not null default 'live';
 
+-- Visits: one row per unique device that opens the public homepage (simple
+-- analytics; total shown in the Leo backend Settings panel).
+create table if not exists visits (
+  id         uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now()
+);
+
 -- App state: a single row (id = 1) holding the menu, next ticket number, and
 -- storefront settings (open/closed, location, next-event date + service hours)
 create table if not exists app_state (
@@ -77,10 +84,12 @@ alter table app_state add column if not exists demo_enabled boolean not null def
 alter table orders    enable row level security;
 alter table archives  enable row level security;
 alter table app_state enable row level security;
+alter table visits    enable row level security;
 
 create policy "anon all orders"    on orders    for all using (true) with check (true);
 create policy "anon all archives"  on archives  for all using (true) with check (true);
 create policy "anon all app_state" on app_state for all using (true) with check (true);
+create policy "anon all visits"    on visits    for all using (true) with check (true);
 
 -- Turn on realtime for all three tables
 alter publication supabase_realtime add table orders;
