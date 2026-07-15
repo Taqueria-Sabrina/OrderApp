@@ -1,9 +1,37 @@
 import { Link } from "react-router-dom";
-import { useStore, eventIsToday, hoursLabel, parseEventDate } from "../lib/store";
+import { useStore, eventIsToday, hoursLabel, parseEventDate, type Taco } from "../lib/store";
 import { useI18n } from "../lib/i18n";
 import LangToggle from "../components/LangToggle";
 import Logo from "../components/Logo";
 import Chillis from "../components/Chilli";
+
+/** One menu row on the public board (used for both tacos and "Other Stuff"). */
+function ItemCard({ item, money, soldOut }: { item: Taco; money: (n: number) => string; soldOut: string }) {
+  return (
+    <div
+      className="flex items-center gap-4 rounded-3xl border-2 bg-paper p-4 shadow-sm"
+      style={{ borderColor: item.active ? `${item.tint}55` : "#f0e3ea", opacity: item.active ? 1 : 0.55 }}
+    >
+      <span className="h-12 w-2 shrink-0 rounded-full" style={{ backgroundColor: item.tint }} />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <h2 className="font-display text-2xl font-black leading-tight text-ink">{item.name}</h2>
+          <Chillis level={item.heat} size={18} />
+        </div>
+        {item.note && <p className="mt-0.5 text-[13px] leading-snug text-ink-soft">{item.note}</p>}
+      </div>
+      {item.active ? (
+        <span className="font-display text-2xl font-black" style={{ color: item.tint }}>
+          {money(item.price)}
+        </span>
+      ) : (
+        <span className="rounded-full bg-cream px-3 py-1 text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">
+          {soldOut}
+        </span>
+      )}
+    </div>
+  );
+}
 
 /**
  * Public storefront — no auth. Shows this week's tacos live (sold-out state
@@ -15,6 +43,8 @@ export default function MenuBoard() {
   const { t, money, longDate } = useI18n();
   const today = longDate(new Date());
   const anyActive = state.menu.some((taco) => taco.active);
+  const tacos = state.menu.filter((m) => m.isTaco);
+  const others = state.menu.filter((m) => !m.isTaco);
 
   const hours = hoursLabel(state.openTime, state.closeTime);
   const eventDateObj = parseEventDate(state.eventDate);
@@ -76,45 +106,22 @@ export default function MenuBoard() {
           )}
         </header>
 
-        {/* Live menu */}
+        {/* Tacos */}
         {anyActive ? (
-          <div className="space-y-3">
-            {state.menu.map((taco) => (
-              <div
-                key={taco.id}
-                className="flex items-center gap-4 rounded-3xl border-2 bg-paper p-4 shadow-sm"
-                style={{
-                  borderColor: taco.active ? `${taco.tint}55` : "#f0e3ea",
-                  opacity: taco.active ? 1 : 0.55,
-                }}
-              >
-                <span className="h-12 w-2 shrink-0 rounded-full" style={{ backgroundColor: taco.tint }} />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <h2 className="font-display text-2xl font-black leading-tight text-ink">{taco.name}</h2>
-                    <Chillis level={taco.heat} size={18} />
-                  </div>
-                  <p className="mt-0.5 text-[13px] leading-snug text-ink-soft">{taco.note}</p>
-                </div>
-                {taco.active ? (
-                  <span className="font-display text-2xl font-black" style={{ color: taco.tint }}>
-                    {money(taco.price)}
-                  </span>
-                ) : (
-                  <span className="rounded-full bg-cream px-3 py-1 text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">
-                    {t("board.soldout")}
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
+          tacos.length > 0 && (
+            <div className="space-y-3">
+              {tacos.map((taco) => (
+                <ItemCard key={taco.id} item={taco} money={money} soldOut={t("board.soldout")} />
+              ))}
+            </div>
+          )
         ) : (
           <p className="rounded-3xl border-2 border-dashed border-line bg-paper py-12 text-center text-base font-bold text-ink-soft">
             {t("board.none")}
           </p>
         )}
 
-        {/* Deal banner */}
+        {/* Deal banner (applies to tacos) */}
         <div className="mt-6 flex items-center justify-center gap-4 rounded-2xl bg-pink-soft py-3 font-display text-xl font-black text-pink-deep">
           <span>1×3€</span>
           <span className="text-pink">·</span>
@@ -122,6 +129,18 @@ export default function MenuBoard() {
           <span className="text-pink">·</span>
           <span>3×7€</span>
         </div>
+
+        {/* Other Stuff — non-taco items, a la carte, below the deal */}
+        {anyActive && others.length > 0 && (
+          <div className="mt-8">
+            <h2 className="mb-3 text-center font-display text-2xl font-black text-ink">{t("board.other")}</h2>
+            <div className="space-y-3">
+              {others.map((item) => (
+                <ItemCard key={item.id} item={item} money={money} soldOut={t("board.soldout")} />
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Instagram follow card — stacks on narrow screens so the button drops
             below the text instead of crowding it, goes side-by-side at sm+ */}
