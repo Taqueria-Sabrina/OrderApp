@@ -46,17 +46,23 @@ create table if not exists archives (
 );
 
 -- App state: a single row (id = 1) holding the menu, next ticket number, and
--- storefront settings (open/closed + today's location, shown on the board)
+-- storefront settings (open/closed, location, next-event date + service hours)
 create table if not exists app_state (
   id          int primary key,
   menu        jsonb not null,
   next_number int   not null default 1,
   open        boolean not null default true,
-  location    text    not null default 'La Cocina Lot'
+  location    text    not null default 'La Cocina Lot',
+  event_date  text    not null default '',
+  open_time   text    not null default '21:00',
+  close_time  text    not null default '23:00'
 );
 -- If app_state already exists from an earlier setup, add the new columns:
-alter table app_state add column if not exists open     boolean not null default true;
-alter table app_state add column if not exists location text    not null default 'La Cocina Lot';
+alter table app_state add column if not exists open       boolean not null default true;
+alter table app_state add column if not exists location   text    not null default 'La Cocina Lot';
+alter table app_state add column if not exists event_date text    not null default '';
+alter table app_state add column if not exists open_time  text    not null default '21:00';
+alter table app_state add column if not exists close_time text    not null default '23:00';
 
 -- Enable Row Level Security, then allow the anon key full access (prototype:
 -- the app is gated by a client-side crew passcode, not per-user auth).

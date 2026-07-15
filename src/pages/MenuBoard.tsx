@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { useStore } from "../lib/store";
+import { useStore, eventIsToday, hoursLabel, parseEventDate } from "../lib/store";
 import { useI18n } from "../lib/i18n";
 import LangToggle from "../components/LangToggle";
 import Logo from "../components/Logo";
@@ -15,6 +15,11 @@ export default function MenuBoard() {
   const { t, money, longDate } = useI18n();
   const today = longDate(new Date());
   const anyActive = state.menu.some((taco) => taco.active);
+
+  const hours = hoursLabel(state.openTime, state.closeTime);
+  const eventDateObj = parseEventDate(state.eventDate);
+  const isToday = eventIsToday(state.eventDate);
+  const location = state.location.trim();
 
   return (
     <div className="min-h-full bg-cream">
@@ -43,8 +48,28 @@ export default function MenuBoard() {
             {state.open && <span className="h-2 w-2 animate-pulse rounded-full bg-teal" />}
             {state.open ? t("board.open") : t("board.closed")}
           </span>
-          {state.open && state.location.trim() && (
-            <p className="mt-2 text-sm font-bold text-ink">{state.location}</p>
+          {state.open ? (
+            // OPEN: location + hours
+            <div className="mt-2 text-center">
+              {location && <p className="text-base font-black text-ink">{location}</p>}
+              {hours && <p className="text-sm font-bold text-ink-soft">{hours}</p>}
+            </div>
+          ) : (
+            // CLOSED: next event (date @ location, or "Today.") + hours
+            <div className="mt-3 text-center">
+              <p className="text-[11px] font-extrabold uppercase tracking-[0.2em] text-pink-deep">
+                {t("board.next_event")}
+              </p>
+              <p className="mt-1 font-display text-xl font-black text-ink">
+                {isToday ? t("board.event_today") : eventDateObj ? longDate(eventDateObj) : location}
+              </p>
+              {(isToday || eventDateObj) && location && (
+                <p className="text-sm font-bold text-ink-soft">
+                  {t("board.at")} {location}
+                </p>
+              )}
+              {hours && <p className="mt-0.5 text-sm font-bold text-ink-soft">{hours}</p>}
+            </div>
           )}
         </header>
 

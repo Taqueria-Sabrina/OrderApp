@@ -61,6 +61,9 @@ export type State = {
   archives: Archive[]; // past closed-out services, newest first
   open: boolean; // is the stand open right now (shown on the public board)
   location: string; // where the stand is today (shown under the open badge)
+  eventDate: string; // next event date "YYYY-MM-DD" ("" if none set)
+  openTime: string; // service start "HH:MM" ("" if none)
+  closeTime: string; // service end "HH:MM" ("" if none)
 };
 
 const STORAGE_KEY = "popup-orders/v5";
@@ -116,15 +119,16 @@ function seedArchives(): Archive[] {
 }
 
 const DEFAULT_LOCATION = "La Cocina Lot";
+const STOREFRONT_DEFAULTS = { open: true, location: DEFAULT_LOCATION, eventDate: "", openTime: "21:00", closeTime: "23:00" };
 
 function defaultState(): State {
-  return { menu: DEFAULT_MENU, orders: seedOrders(), nextNumber: 48, archives: seedArchives(), open: true, location: DEFAULT_LOCATION };
+  return { menu: DEFAULT_MENU, orders: seedOrders(), nextNumber: 48, archives: seedArchives(), ...STOREFRONT_DEFAULTS };
 }
 
 /** Cloud mode's starting snapshot before the DB hydrates — no fake seed data,
  *  just the default menu so the first paint isn't empty. */
 function emptyCloudState(): State {
-  return { menu: DEFAULT_MENU, orders: [], nextNumber: 1, archives: [], open: true, location: DEFAULT_LOCATION };
+  return { menu: DEFAULT_MENU, orders: [], nextNumber: 1, archives: [], ...STOREFRONT_DEFAULTS };
 }
 
 /** Ensure every taco has a heat rating (0–3), for menus saved before the field. */
@@ -142,6 +146,9 @@ function load(): State {
     if (!parsed.archives) parsed.archives = []; // forward-compat with pre-archive state
     if (typeof parsed.open !== "boolean") parsed.open = true; // pre-open-flag state
     if (typeof parsed.location !== "string") parsed.location = DEFAULT_LOCATION;
+    if (typeof parsed.eventDate !== "string") parsed.eventDate = "";
+    if (typeof parsed.openTime !== "string") parsed.openTime = STOREFRONT_DEFAULTS.openTime;
+    if (typeof parsed.closeTime !== "string") parsed.closeTime = STOREFRONT_DEFAULTS.closeTime;
     parsed.menu = normalizeMenu(parsed.menu);
     return parsed;
   } catch {
@@ -280,16 +287,31 @@ async function hydrateFromCloud() {
   archives.sort((a, b) => b.closedAt - a.closedAt);
 
   const app = appRes.data as
-    | { menu: Taco[]; next_number: number; open?: boolean; location?: string }
+    | {
+        menu: Taco[];
+        next_number: number;
+        open?: boolean;
+        location?: string;
+        event_date?: string | null;
+        open_time?: string | null;
+        close_time?: string | null;
+      }
     | null;
 
   // First run against an empty DB: seed it with the default menu so the stand
   // has tacos to sell (orders/archives start empty in the cloud).
   if (!app) {
-    await supabase
-      .from("app_state")
-      .insert({ id: 1, menu: DEFAULT_MENU, next_number: 1, open: true, location: DEFAULT_LOCATION });
-    setState({ menu: DEFAULT_MENU, orders: [], nextNumber: 1, archives: [], open: true, location: DEFAULT_LOCATION });
+    await supabase.from("app_state").insert({
+      id: 1,
+      menu: DEFAULT_MENU,
+      next_number: 1,
+      open: STOREFRONT_DEFAULTS.open,
+      location: STOREFRONT_DEFAULTS.location,
+      event_date: STOREFRONT_DEFAULTS.eventDate,
+      open_time: STOREFRONT_DEFAULTS.openTime,
+      close_time: STOREFRONT_DEFAULTS.closeTime,
+    });
+    setState({ menu: DEFAULT_MENU, orders: [], nextNumber: 1, archives: [], ...STOREFRONT_DEFAULTS });
     return;
   }
 
@@ -299,8 +321,11 @@ async function hydrateFromCloud() {
     nextNumber: app.next_number,
     archives,
     // Columns may be absent on a row seeded before these fields existed.
-    open: app.open ?? true,
-    location: app.location ?? DEFAULT_LOCATION,
+    open: app.open ?? STOREFRONT_DEFAULTS.open,
+    location: app.location ?? STOREFRONT_DEFAULTS.location,
+    eventDate: app.event_date ?? "",
+    openTime: app.open_time ?? STOREFRONT_DEFAULTS.openTime,
+    closeTime: app.close_time ?? STOREFRONT_DEFAULTS.closeTime,
   });
 }
 
@@ -427,6 +452,18 @@ export function setLocation(location: string) {
   }
 }
 
+/** Update the next-event schedule (date + service hours), shown on the board. */
+export function setSchedule(patch: Partial<Pick<State, "eventDate" | "openTime" | "closeTime">>) {
+  setState({ ...state, ...patch });
+  if (MODE === "cloud" && supabase) {
+    const row: Record<string, string> = {};
+    if (patch.eventDate !== undefined) row.event_date = patch.eventDate;
+    if (patch.openTime !== undefined) row.open_time = patch.openTime;
+    if (patch.closeTime !== undefined) row.close_time = patch.closeTime;
+    push(supabase.from("app_state").update(row).eq("id", 1));
+  }
+}
+
 export function updateTaco(id: string, patch: Partial<Taco>) {
   const menu = state.menu.map((t) => (t.id === id ? { ...t, ...patch } : t));
   setState({ ...state, menu });
@@ -437,14 +474,27 @@ export function updateTaco(id: string, patch: Partial<Taco>) {
 
 export function resetService() {
   const fresh: State = MODE === "cloud"
-    ? { menu: DEFAULT_MENU, orders: [], nextNumber: 1, archives: [], open: true, location: DEFAULT_LOCATION }
+    ? { menu: DEFAULT_MENU, orders: [], nextNumber: 1, archives: [], ...STOREFRONT_DEFAULTS }
     : defaultState();
   setState(fresh);
   if (MODE === "cloud" && supabase) {
     // Wipe orders + archives, restore the default menu + settings.
     push(supabase.from("orders").delete().neq("id", ""));
     push(supabase.from("archives").delete().neq("id", ""));
-    push(supabase.from("app_state").update({ menu: DEFAULT_MENU, next_number: 1, open: true, location: DEFAULT_LOCATION }).eq("id", 1));
+    push(
+      supabase
+        .from("app_state")
+        .update({
+          menu: DEFAULT_MENU,
+          next_number: 1,
+          open: STOREFRONT_DEFAULTS.open,
+          location: STOREFRONT_DEFAULTS.location,
+          event_date: STOREFRONT_DEFAULTS.eventDate,
+          open_time: STOREFRONT_DEFAULTS.openTime,
+          close_time: STOREFRONT_DEFAULTS.closeTime,
+        })
+        .eq("id", 1),
+    );
   }
 }
 
@@ -557,4 +607,28 @@ export function revenueByTacoOf(orders: Order[]) {
 
 export function revenueByTaco(state: State) {
   return revenueByTacoOf(state.orders);
+}
+
+// ---- Storefront schedule helpers ----
+
+/** Today's date as a local "YYYY-MM-DD" (matches the <input type=date> value). */
+export function localTodayISO(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** Parse a "YYYY-MM-DD" string into a LOCAL Date (avoids UTC off-by-one). */
+export function parseEventDate(iso: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : null;
+}
+
+/** True when the configured event date is today. */
+export function eventIsToday(eventDate: string): boolean {
+  return eventDate !== "" && eventDate === localTodayISO();
+}
+
+/** "21:00 – 23:00" when both times are set, else "". */
+export function hoursLabel(openTime: string, closeTime: string): string {
+  return openTime && closeTime ? `${openTime} – ${closeTime}` : "";
 }
