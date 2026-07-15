@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
-import { DEMO_KEY, isDemo, leaveDemo } from "./store";
+import { DEMO_KEY, isDemo, leaveDemo, isDemoEnabled } from "./store";
 
 /**
  * Staff gate for the back-of-house app.
@@ -74,6 +74,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const live = combined === CREDENTIAL_HASH;
     const demo = combined === DEMO_CREDENTIAL_HASH;
     if (!live && !demo) return false;
+
+    // Demo access can be switched off from the live backend.
+    if (demo && !(await isDemoEnabled())) return false;
 
     try {
       localStorage.setItem(AUTH_KEY, "1");

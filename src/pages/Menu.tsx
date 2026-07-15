@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useStore, updateTaco, resetService, setOpen, setLocation, setSchedule, addMenuItem, removeMenuItem } from "../lib/store";
+import { useStore, updateTaco, resetService, setOpen, setLocation, setSchedule, addMenuItem, removeMenuItem, isDemo, useDemoControl, setDemoEnabled, bootDemo } from "../lib/store";
 import { useI18n } from "../lib/i18n";
 import { ChilliPicker } from "../components/Chilli";
 
@@ -56,6 +56,36 @@ function AddItem() {
       >
         {t("menu.add_btn")}
       </button>
+    </div>
+  );
+}
+
+function DemoControl() {
+  const { t } = useI18n();
+  const { demoEnabled, demoCount } = useDemoControl();
+  const active = demoCount > 0;
+
+  return (
+    <div className="rounded-2xl border-2 border-line bg-paper p-4 shadow-sm">
+      <p className="mb-3 text-[11px] font-extrabold uppercase tracking-[0.2em] text-teal-deep">{t("menu.demo_title")}</p>
+      <div className="flex items-center justify-between">
+        <span className="font-display text-lg font-black text-ink">{t("menu.demo_toggle")}</span>
+        <Toggle on={demoEnabled} onClick={() => setDemoEnabled(!demoEnabled)} />
+      </div>
+      <div className="mt-3 flex items-center gap-2">
+        <span className={`h-2.5 w-2.5 rounded-full ${active ? "animate-pulse" : ""}`} style={{ backgroundColor: active ? "#c8437f" : "#e2d5dd" }} />
+        <span className="text-[13px] font-bold text-ink-soft">
+          {active ? t("menu.demo_active", { n: demoCount }) : t("menu.demo_none")}
+        </span>
+      </div>
+      {active && (
+        <button
+          onClick={bootDemo}
+          className="mt-3 w-full rounded-2xl border-2 border-pink-deep py-2.5 text-sm font-black uppercase tracking-wide text-pink-deep transition active:scale-[0.98]"
+        >
+          {t("menu.demo_boot")}
+        </button>
+      )}
     </div>
   );
 }
@@ -204,6 +234,13 @@ export default function Menu() {
       <div className="mt-4 px-5">
         <AddItem />
       </div>
+
+      {/* Demo access control — live backend only */}
+      {!isDemo && (
+        <div className="mt-4 px-5">
+          <DemoControl />
+        </div>
+      )}
 
       <div className="mt-auto px-5 pb-8 pt-6">
         <button

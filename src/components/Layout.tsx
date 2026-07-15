@@ -1,7 +1,8 @@
+import { useEffect } from "react";
 import { NavLink, Outlet, Link } from "react-router-dom";
 import { useI18n } from "../lib/i18n";
 import { useAuth } from "../lib/auth";
-import { isDemo } from "../lib/store";
+import { isDemo, useDemoControl } from "../lib/store";
 import LangToggle from "./LangToggle";
 import LiveBadge from "./LiveBadge";
 import Logo from "./Logo";
@@ -17,6 +18,13 @@ const NAV = [
 export default function Layout() {
   const { t } = useI18n();
   const { logout } = useAuth();
+  const { demoEnabled, kicked } = useDemoControl();
+
+  // Demo session gets booted when the live backend disables demo or hits "boot".
+  useEffect(() => {
+    if (isDemo && (kicked || !demoEnabled)) logout();
+  }, [kicked, demoEnabled, logout]);
+
   return (
     <div className="mx-auto flex h-full max-w-md flex-col bg-cream">
       {/* Festive papel-picado teal edge */}

@@ -286,6 +286,31 @@ export function useLiveBoard(): BoardSnapshot {
   );
 }
 
+// ---- Demo control (owned by the live/Leo backend) ----
+//
+// `demoEnabled` (app_state id 1) is the kill switch for admin/admin access.
+// `demoCount` is how many demo devices are currently connected (presence).
+// `kicked` flips true on a demo device when the live backend boots it.
+
+type Control = { demoEnabled: boolean; demoCount: number; kicked: boolean };
+let control: Control = { demoEnabled: true, demoCount: 0, kicked: false };
+const controlListeners = new Set<() => void>();
+function setControl(patch: Partial<Control>) {
+  control = { ...control, ...patch };
+  for (const l of controlListeners) l();
+}
+
+export function useDemoControl(): Control {
+  return useSyncExternalStore(
+    (cb) => {
+      controlListeners.add(cb);
+      return () => controlListeners.delete(cb);
+    },
+    () => control,
+    () => control,
+  );
+}
+
 // ---- Cloud backend (Supabase) ----
 //
 // Row shapes mirror the SQL schema (see README / the setup snippet). Timestamps
@@ -408,6 +433,7 @@ async function fetchLiveBoard() {
     event_date?: string | null;
     open_time?: string | null;
     close_time?: string | null;
+    demo_enabled?: boolean | null;
   } | null;
   if (!app) return;
   setBoard({
@@ -418,6 +444,8 @@ async function fetchLiveBoard() {
     openTime: app.open_time ?? STOREFRONT_DEFAULTS.openTime,
     closeTime: app.close_time ?? STOREFRONT_DEFAULTS.closeTime,
   });
+  // demo_enabled column may not exist yet (pre-migration) → default enabled.
+  setControl({ demoEnabled: app.demo_enabled ?? true });
 }
 
 // A short debounce collapses bursts of realtime events (e.g. an insert + an
@@ -474,22 +502,32 @@ async function resetDemo() {
   await hydrateFromCloud();
 }
 
+// Shared presence channel: DEMO devices `track` themselves (so they're counted
+// and can be reset/kicked); the LIVE (Leo) backend joins WITHOUT tracking, just
+// to observe the demo device count and to broadcast a "kick".
 let demoPresence: RealtimeChannel | null = null;
 let demoResetChecked = false;
 
-if (isDemo && MODE === "cloud" && supabase) {
-  // Vary the key per client so presence counts distinct devices.
+if (MODE === "cloud" && supabase) {
   const key = `${Date.now().toString(36)}-${Math.floor(Math.random() * 1e6).toString(36)}`;
   demoPresence = supabase.channel("demo-presence", { config: { presence: { key } } });
   demoPresence
     .on("presence", { event: "sync" }, () => {
-      if (demoResetChecked || !demoPresence) return; // only decide on first sync
-      demoResetChecked = true;
+      if (!demoPresence) return;
       const members = Object.keys(demoPresence.presenceState()).length;
-      if (members <= 1) void resetDemo(); // we're alone → fresh demo
+      setControl({ demoCount: members });
+      // Demo device: on our FIRST sync, if we're alone, reseed a fresh demo.
+      if (isDemo && !demoResetChecked) {
+        demoResetChecked = true;
+        if (members <= 1) void resetDemo();
+      }
+    })
+    .on("broadcast", { event: "kick" }, () => {
+      if (isDemo) setControl({ kicked: true }); // live backend booted us
     })
     .subscribe((status) => {
-      if (status === "SUBSCRIBED") void demoPresence?.track({ at: Date.now() });
+      // Only demo devices announce themselves; the live backend just observes.
+      if (status === "SUBSCRIBED" && isDemo) void demoPresence?.track({ at: Date.now() });
     });
 }
 
@@ -502,6 +540,26 @@ export async function leaveDemo() {
   await demoPresence.untrack();
   await supabase.removeChannel(demoPresence);
   demoPresence = null;
+}
+
+/** Live backend: enable/disable admin/admin demo access (app_state id 1). */
+export function setDemoEnabled(enabled: boolean) {
+  setControl({ demoEnabled: enabled });
+  if (MODE === "cloud" && supabase) {
+    push(supabase.from("app_state").update({ demo_enabled: enabled }).eq("id", 1));
+  }
+}
+
+/** Live backend: boot every connected demo device right now. */
+export function bootDemo() {
+  demoPresence?.send({ type: "broadcast", event: "kick", payload: {} });
+}
+
+/** Is demo access currently enabled? (read live app_state id 1) */
+export async function isDemoEnabled(): Promise<boolean> {
+  if (!supabase) return true;
+  const { data } = await supabase.from("app_state").select("demo_enabled").eq("id", 1).maybeSingle();
+  return (data as { demo_enabled?: boolean } | null)?.demo_enabled ?? true;
 }
 
 /** Fire-and-forget a Supabase write; log failures without breaking the UI. */

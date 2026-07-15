@@ -62,6 +62,11 @@ const ES: Dict = {
   "menu.add_ph": "Nombre del artículo",
   "menu.add_is_taco": "Es un taco (entra en la oferta 1×3 · 2×5 · 3×7)",
   "menu.add_btn": "Añadir",
+  "menu.demo_title": "Acceso demo (admin/admin)",
+  "menu.demo_toggle": "Permitir acceso demo",
+  "menu.demo_active": ({ n }) => `${n} dispositivo${Number(n) === 1 ? "" : "s"} en demo ahora`,
+  "menu.demo_none": "Nadie en la demo ahora mismo",
+  "menu.demo_boot": "Expulsar a todos",
 
   "login.title": "Trastienda",
   "login.sub": "Solo para el equipo de Sabrina",
@@ -201,6 +206,11 @@ const EN: Dict = {
   "menu.add_ph": "Item name",
   "menu.add_is_taco": "It's a taco (joins the 1×3 · 2×5 · 3×7 deal)",
   "menu.add_btn": "Add",
+  "menu.demo_title": "Demo access (admin/admin)",
+  "menu.demo_toggle": "Allow demo access",
+  "menu.demo_active": ({ n }) => `${n} device${Number(n) === 1 ? "" : "s"} on demo now`,
+  "menu.demo_none": "Nobody on the demo right now",
+  "menu.demo_boot": "Boot everyone",
 
   "login.title": "Back of House",
   "login.sub": "Sabrina crew only",
