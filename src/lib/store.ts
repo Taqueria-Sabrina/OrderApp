@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase, isSupabaseConfigured } from "./supabase";
 
 /**
@@ -21,6 +22,26 @@ import { supabase, isSupabaseConfigured } from "./supabase";
  */
 
 const MODE: "cloud" | "local" = isSupabaseConfigured ? "cloud" : "local";
+
+/**
+ * Demo mode. When a viewer logs in with the demo credentials (admin/admin),
+ * auth sets this flag and reloads; the whole backend then reads/writes a
+ * SEPARATE namespace so it can't touch or reveal the real (live) data:
+ *   - app_state row id 2 (live is id 1)
+ *   - orders/archives rows tagged env = 'demo' (live is 'live')
+ * Demo devices still sync with each other in realtime. The public board always
+ * reads live (see lib/liveBoard.ts).
+ */
+export const DEMO_KEY = "popup-orders/demo";
+export const isDemo = (() => {
+  try {
+    return localStorage.getItem(DEMO_KEY) === "1";
+  } catch {
+    return false;
+  }
+})();
+const ENV: "live" | "demo" = isDemo ? "demo" : "live";
+const APP_STATE_ID = isDemo ? 2 : 1;
 
 // A menu item. isTaco items share the 1×3/2×5/3×7 bundle deal; non-taco items
 // (drinks, sides, …) are priced a la carte at their own price.
@@ -190,7 +211,11 @@ function cache() {
 function setState(next: State) {
   state = next;
   cache();
-  if (MODE === "local") channel?.postMessage(state);
+  if (MODE === "local") {
+    channel?.postMessage(state);
+    // In local mode there's no cloud, so the main store IS the live board.
+    if (!isDemo) setBoard(boardOf(next));
+  }
   emit();
 }
 
@@ -198,6 +223,7 @@ if (MODE === "local") {
   // Receive updates from other tabs on this device.
   channel?.addEventListener("message", (e: MessageEvent<State>) => {
     state = e.data;
+    if (!isDemo) setBoard(boardOf(state));
     emit();
   });
 
@@ -207,6 +233,7 @@ if (MODE === "local") {
       if (e.key === STORAGE_KEY && e.newValue) {
         try {
           state = JSON.parse(e.newValue) as State;
+          if (!isDemo) setBoard(boardOf(state));
           emit();
         } catch {
           /* ignore */
@@ -229,6 +256,36 @@ export function useStore(): State {
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
+// ---- Public board snapshot (ALWAYS live, app_state id 1) ----
+//
+// The public `/` homepage must show LIVE data even on a demo device (whose main
+// store points at the demo namespace). This is a small separate snapshot bound
+// to app_state id 1, used only by the public MenuBoard.
+
+export type BoardSnapshot = Pick<State, "menu" | "open" | "location" | "eventDate" | "openTime" | "closeTime">;
+
+function boardOf(s: Pick<State, keyof BoardSnapshot>): BoardSnapshot {
+  return { menu: s.menu, open: s.open, location: s.location, eventDate: s.eventDate, openTime: s.openTime, closeTime: s.closeTime };
+}
+
+let board: BoardSnapshot = boardOf(load());
+const boardListeners = new Set<() => void>();
+function setBoard(next: BoardSnapshot) {
+  board = next;
+  for (const l of boardListeners) l();
+}
+
+export function useLiveBoard(): BoardSnapshot {
+  return useSyncExternalStore(
+    (cb) => {
+      boardListeners.add(cb);
+      return () => boardListeners.delete(cb);
+    },
+    () => board,
+    () => board,
+  );
+}
+
 // ---- Cloud backend (Supabase) ----
 //
 // Row shapes mirror the SQL schema (see README / the setup snippet). Timestamps
@@ -243,6 +300,7 @@ type OrderRow = {
   status: OrderStatus;
   created_at: number;
   completed_at: number | null;
+  env?: string;
 };
 
 type ArchiveRow = { id: string; closed_at: number; orders: Order[] };
@@ -257,6 +315,7 @@ function orderToRow(o: Order): OrderRow {
     status: o.status,
     created_at: o.createdAt,
     completed_at: o.completedAt ?? null,
+    env: ENV, // namespace tag so demo rows never mix with live
   };
 }
 
@@ -279,18 +338,19 @@ async function hydrateFromCloud() {
   const [ordersRes, archivesRes, appRes] = await Promise.all([
     supabase.from("orders").select("*"),
     supabase.from("archives").select("*"),
-    supabase.from("app_state").select("*").eq("id", 1).maybeSingle(),
+    supabase.from("app_state").select("*").eq("id", APP_STATE_ID).maybeSingle(),
   ]);
 
-  const orders = (ordersRes.data as OrderRow[] | null)?.map(rowToOrder) ?? [];
+  // Filter by namespace client-side so a missing `env` column (before the
+  // one-time migration) reads as 'live' and never errors the whole request.
+  const inEnv = (r: { env?: string | null }) => (r.env ?? "live") === ENV;
+
+  const orders = ((ordersRes.data as OrderRow[] | null) ?? []).filter(inEnv).map(rowToOrder);
   orders.sort((a, b) => a.createdAt - b.createdAt);
 
-  const archives =
-    (archivesRes.data as ArchiveRow[] | null)?.map((r) => ({
-      id: r.id,
-      closedAt: r.closed_at,
-      orders: r.orders,
-    })) ?? [];
+  const archives = ((archivesRes.data as (ArchiveRow & { env?: string | null })[] | null) ?? [])
+    .filter(inEnv)
+    .map((r) => ({ id: r.id, closedAt: r.closed_at, orders: r.orders }));
   archives.sort((a, b) => b.closedAt - a.closedAt);
 
   const app = appRes.data as
@@ -308,17 +368,18 @@ async function hydrateFromCloud() {
   // First run against an empty DB: seed it with the default menu so the stand
   // has tacos to sell (orders/archives start empty in the cloud).
   if (!app) {
+    const seededStorefront = isDemo ? { ...STOREFRONT_DEFAULTS, location: "Demo Lot" } : STOREFRONT_DEFAULTS;
     await supabase.from("app_state").insert({
-      id: 1,
+      id: APP_STATE_ID,
       menu: DEFAULT_MENU,
       next_number: 1,
-      open: STOREFRONT_DEFAULTS.open,
-      location: STOREFRONT_DEFAULTS.location,
-      event_date: STOREFRONT_DEFAULTS.eventDate,
-      open_time: STOREFRONT_DEFAULTS.openTime,
-      close_time: STOREFRONT_DEFAULTS.closeTime,
+      open: seededStorefront.open,
+      location: seededStorefront.location,
+      event_date: seededStorefront.eventDate,
+      open_time: seededStorefront.openTime,
+      close_time: seededStorefront.closeTime,
     });
-    setState({ menu: DEFAULT_MENU, orders: [], nextNumber: 1, archives: [], ...STOREFRONT_DEFAULTS });
+    setState({ menu: DEFAULT_MENU, orders: [], nextNumber: 1, archives: [], ...seededStorefront });
     return;
   }
 
@@ -336,6 +397,29 @@ async function hydrateFromCloud() {
   });
 }
 
+/** Refresh the always-live public board snapshot from app_state id 1. */
+async function fetchLiveBoard() {
+  if (!supabase) return;
+  const { data } = await supabase.from("app_state").select("*").eq("id", 1).maybeSingle();
+  const app = data as {
+    menu: Taco[];
+    open?: boolean;
+    location?: string;
+    event_date?: string | null;
+    open_time?: string | null;
+    close_time?: string | null;
+  } | null;
+  if (!app) return;
+  setBoard({
+    menu: normalizeMenu(app.menu),
+    open: app.open ?? STOREFRONT_DEFAULTS.open,
+    location: app.location ?? STOREFRONT_DEFAULTS.location,
+    eventDate: app.event_date ?? "",
+    openTime: app.open_time ?? STOREFRONT_DEFAULTS.openTime,
+    closeTime: app.close_time ?? STOREFRONT_DEFAULTS.closeTime,
+  });
+}
+
 // A short debounce collapses bursts of realtime events (e.g. an insert + an
 // app_state update from the same action) into a single refetch.
 let refetchTimer: ReturnType<typeof setTimeout> | null = null;
@@ -344,11 +428,13 @@ function scheduleRefetch() {
   refetchTimer = setTimeout(() => {
     refetchTimer = null;
     void hydrateFromCloud();
+    void fetchLiveBoard(); // keep the public board current (live id 1)
   }, 120);
 }
 
 if (MODE === "cloud" && supabase) {
   void hydrateFromCloud();
+  void fetchLiveBoard();
   // One channel covering all three tables; any change triggers a refetch so the
   // local snapshot converges to the DB across every device.
   supabase
@@ -357,6 +443,65 @@ if (MODE === "cloud" && supabase) {
     .on("postgres_changes", { event: "*", schema: "public", table: "archives" }, scheduleRefetch)
     .on("postgres_changes", { event: "*", schema: "public", table: "app_state" }, scheduleRefetch)
     .subscribe();
+}
+
+// ---- Demo namespace lifecycle (presence-based reset) ----
+//
+// Demo devices join a presence channel. The first one in (nobody else present)
+// reseeds a clean demo; on explicit logout the last one out clears it. This
+// keeps every demo showing tidy without touching live data.
+
+async function wipeDemoRows() {
+  if (!supabase) return;
+  await supabase.from("orders").delete().eq("env", "demo");
+  await supabase.from("archives").delete().eq("env", "demo");
+}
+
+/** Reseed a clean demo: empty orders/archives + default menu & storefront. */
+async function resetDemo() {
+  if (!supabase) return;
+  await wipeDemoRows();
+  await supabase.from("app_state").upsert({
+    id: 2,
+    menu: DEFAULT_MENU,
+    next_number: 1,
+    open: true,
+    location: "Demo Lot",
+    event_date: "",
+    open_time: STOREFRONT_DEFAULTS.openTime,
+    close_time: STOREFRONT_DEFAULTS.closeTime,
+  });
+  await hydrateFromCloud();
+}
+
+let demoPresence: RealtimeChannel | null = null;
+let demoResetChecked = false;
+
+if (isDemo && MODE === "cloud" && supabase) {
+  // Vary the key per client so presence counts distinct devices.
+  const key = `${Date.now().toString(36)}-${Math.floor(Math.random() * 1e6).toString(36)}`;
+  demoPresence = supabase.channel("demo-presence", { config: { presence: { key } } });
+  demoPresence
+    .on("presence", { event: "sync" }, () => {
+      if (demoResetChecked || !demoPresence) return; // only decide on first sync
+      demoResetChecked = true;
+      const members = Object.keys(demoPresence.presenceState()).length;
+      if (members <= 1) void resetDemo(); // we're alone → fresh demo
+    })
+    .subscribe((status) => {
+      if (status === "SUBSCRIBED") void demoPresence?.track({ at: Date.now() });
+    });
+}
+
+/** Called by auth on demo logout: if we're the last demo device, clear demo
+ *  data; then leave the presence channel. */
+export async function leaveDemo() {
+  if (!isDemo || !supabase || !demoPresence) return;
+  const members = Object.keys(demoPresence.presenceState()).length;
+  if (members <= 1) await wipeDemoRows();
+  await demoPresence.untrack();
+  await supabase.removeChannel(demoPresence);
+  demoPresence = null;
 }
 
 /** Fire-and-forget a Supabase write; log failures without breaking the UI. */
@@ -392,7 +537,7 @@ export function fireOrder(items: Record<string, number>, note: string, name = ""
   setState({ ...state, orders: [...state.orders, order], nextNumber });
   if (MODE === "cloud" && supabase) {
     push(supabase.from("orders").insert(orderToRow(order)));
-    push(supabase.from("app_state").update({ next_number: nextNumber }).eq("id", 1));
+    push(supabase.from("app_state").update({ next_number: nextNumber }).eq("id", APP_STATE_ID));
   }
 }
 
@@ -447,7 +592,7 @@ export function deleteOrder(id: string) {
 export function setOpen(open: boolean) {
   setState({ ...state, open });
   if (MODE === "cloud" && supabase) {
-    push(supabase.from("app_state").update({ open }).eq("id", 1));
+    push(supabase.from("app_state").update({ open }).eq("id", APP_STATE_ID));
   }
 }
 
@@ -455,7 +600,7 @@ export function setOpen(open: boolean) {
 export function setLocation(location: string) {
   setState({ ...state, location });
   if (MODE === "cloud" && supabase) {
-    push(supabase.from("app_state").update({ location }).eq("id", 1));
+    push(supabase.from("app_state").update({ location }).eq("id", APP_STATE_ID));
   }
 }
 
@@ -467,7 +612,7 @@ export function setSchedule(patch: Partial<Pick<State, "eventDate" | "openTime" 
     if (patch.eventDate !== undefined) row.event_date = patch.eventDate;
     if (patch.openTime !== undefined) row.open_time = patch.openTime;
     if (patch.closeTime !== undefined) row.close_time = patch.closeTime;
-    push(supabase.from("app_state").update(row).eq("id", 1));
+    push(supabase.from("app_state").update(row).eq("id", APP_STATE_ID));
   }
 }
 
@@ -475,7 +620,7 @@ export function updateTaco(id: string, patch: Partial<Taco>) {
   const menu = state.menu.map((t) => (t.id === id ? { ...t, ...patch } : t));
   setState({ ...state, menu });
   if (MODE === "cloud" && supabase) {
-    push(supabase.from("app_state").update({ menu }).eq("id", 1));
+    push(supabase.from("app_state").update({ menu }).eq("id", APP_STATE_ID));
   }
 }
 
@@ -499,7 +644,7 @@ export function addMenuItem(name: string, isTaco: boolean) {
   const menu = [...state.menu, item];
   setState({ ...state, menu });
   if (MODE === "cloud" && supabase) {
-    push(supabase.from("app_state").update({ menu }).eq("id", 1));
+    push(supabase.from("app_state").update({ menu }).eq("id", APP_STATE_ID));
   }
 }
 
@@ -508,19 +653,23 @@ export function removeMenuItem(id: string) {
   const menu = state.menu.filter((t) => t.id !== id);
   setState({ ...state, menu });
   if (MODE === "cloud" && supabase) {
-    push(supabase.from("app_state").update({ menu }).eq("id", 1));
+    push(supabase.from("app_state").update({ menu }).eq("id", APP_STATE_ID));
   }
 }
 
 export function resetService() {
+  // Capture current ids first so we delete exactly this namespace's rows
+  // (by id — avoids depending on the env column existing).
+  const orderIds = state.orders.map((o) => o.id);
+  const archiveIds = state.archives.map((a) => a.id);
   const fresh: State = MODE === "cloud"
     ? { menu: DEFAULT_MENU, orders: [], nextNumber: 1, archives: [], ...STOREFRONT_DEFAULTS }
     : defaultState();
   setState(fresh);
   if (MODE === "cloud" && supabase) {
-    // Wipe orders + archives, restore the default menu + settings.
-    push(supabase.from("orders").delete().neq("id", ""));
-    push(supabase.from("archives").delete().neq("id", ""));
+    // Wipe this namespace's orders + archives, restore defaults.
+    if (orderIds.length) push(supabase.from("orders").delete().in("id", orderIds));
+    if (archiveIds.length) push(supabase.from("archives").delete().in("id", archiveIds));
     push(
       supabase
         .from("app_state")
@@ -533,7 +682,7 @@ export function resetService() {
           open_time: STOREFRONT_DEFAULTS.openTime,
           close_time: STOREFRONT_DEFAULTS.closeTime,
         })
-        .eq("id", 1),
+        .eq("id", APP_STATE_ID),
     );
   }
 }
@@ -554,9 +703,10 @@ export function closeOutDay() {
     archives: [archive, ...state.archives],
   });
   if (MODE === "cloud" && supabase) {
-    push(supabase.from("archives").insert({ id: archive.id, closed_at: archive.closedAt, orders: archive.orders }));
-    push(supabase.from("orders").delete().neq("id", ""));
-    push(supabase.from("app_state").update({ next_number: 1 }).eq("id", 1));
+    const orderIds = archive.orders.map((o) => o.id);
+    push(supabase.from("archives").insert({ id: archive.id, closed_at: archive.closedAt, orders: archive.orders, env: ENV }));
+    if (orderIds.length) push(supabase.from("orders").delete().in("id", orderIds));
+    push(supabase.from("app_state").update({ next_number: 1 }).eq("id", APP_STATE_ID));
   }
 }
 

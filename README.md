@@ -24,7 +24,8 @@ If those are absent, the app falls back to **same-device-only** sync (BroadcastC
 Run this in the Supabase SQL editor (Dashboard → SQL Editor → New query):
 
 ```sql
--- Orders: one row per ticket
+-- Orders: one row per ticket. `env` separates the demo namespace ('demo')
+-- from real data ('live') so the admin/admin demo can't touch live orders.
 create table if not exists orders (
   id           text primary key,
   number       int  not null,
@@ -33,15 +34,20 @@ create table if not exists orders (
   note         text not null default '',
   status       text not null default 'new',
   created_at   bigint not null,
-  completed_at bigint
+  completed_at bigint,
+  env          text not null default 'live'
 );
+-- If orders already exists from an earlier setup, add the column:
+alter table orders add column if not exists env text not null default 'live';
 
 -- Archives: one row per closed-out service (a JSON snapshot of its orders)
 create table if not exists archives (
   id        text primary key,
   closed_at bigint not null,
-  orders    jsonb  not null default '[]'
+  orders    jsonb  not null default '[]',
+  env       text not null default 'live'
 );
+alter table archives add column if not exists env text not null default 'live';
 
 -- App state: a single row (id = 1) holding the menu, next ticket number, and
 -- storefront settings (open/closed, location, next-event date + service hours)

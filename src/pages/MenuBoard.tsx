@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { useStore, eventIsToday, hoursLabel, parseEventDate, type Taco } from "../lib/store";
+import { useLiveBoard, eventIsToday, hoursLabel, parseEventDate, type Taco } from "../lib/store";
 import { useI18n } from "../lib/i18n";
 import LangToggle from "../components/LangToggle";
 import Logo from "../components/Logo";
@@ -39,7 +39,8 @@ function ItemCard({ item, money, soldOut }: { item: Taco; money: (n: number) => 
  * and the bundle deal. Classic Taqueria Sabrina look.
  */
 export default function MenuBoard() {
-  const state = useStore();
+  // Always the LIVE board (app_state id 1) — never demo data, even on a demo device.
+  const state = useLiveBoard();
   const { t, money, longDate } = useI18n();
   const today = longDate(new Date());
   const anyActive = state.menu.some((taco) => taco.active);

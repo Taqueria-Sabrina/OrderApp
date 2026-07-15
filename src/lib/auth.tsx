@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
+import { DEMO_KEY, isDemo, leaveDemo } from "./store";
 
 /**
  * Staff gate for the back-of-house app.
@@ -22,6 +23,8 @@ const AUTH_KEY = "popup-orders/staff-auth";
 // - PASSWORD_HASH: sha256("<password>"), used to re-confirm destructive actions.
 const CREDENTIAL_HASH = "3ef6f858bd8979fafae9e59c49b0a25fc98604f6c189f1ed8454aaa9663d4539";
 const PASSWORD_HASH = "a9c92dc7a265d1610c1a9529cac0795c98cb6f6d7eaf9b3c75358921e97a4e49";
+// Demo login (admin/admin) → sandboxed demo namespace, isolated from live.
+const DEMO_CREDENTIAL_HASH = "8da193366e1554c08b2870c50f737b9587c3372b656151c4a96028af26f51334";
 
 async function sha256Hex(input: string): Promise<string> {
   // Web Crypto is only exposed in a SECURE context (HTTPS / localhost). The app
@@ -67,22 +70,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authed, setAuthed] = useState<boolean>(initialAuthed);
 
   const login = async (username: string, password: string) => {
-    if (!(await verifyCredentials(username, password))) return false;
-    setAuthed(true);
+    const combined = await sha256Hex(`${username.trim()}:${password}`);
+    const live = combined === CREDENTIAL_HASH;
+    const demo = combined === DEMO_CREDENTIAL_HASH;
+    if (!live && !demo) return false;
+
     try {
       localStorage.setItem(AUTH_KEY, "1");
+      if (demo) localStorage.setItem(DEMO_KEY, "1");
+      else localStorage.removeItem(DEMO_KEY);
     } catch {
       /* ignore */
     }
+
+    // The store binds its data namespace (live vs demo) at page load, so when
+    // the session's namespace must change we do a full reload into /app.
+    if (demo !== isDemo) {
+      location.assign(`${import.meta.env.BASE_URL}app`);
+      return true; // page is reloading
+    }
+
+    setAuthed(true);
     return true;
   };
 
   const logout = () => {
-    setAuthed(false);
-    try {
-      localStorage.removeItem(AUTH_KEY);
-    } catch {
-      /* ignore */
+    // Demo: let the store leave presence + clear demo data if we're the last one.
+    const wasDemo = isDemo;
+    const finish = () => {
+      try {
+        localStorage.removeItem(AUTH_KEY);
+        localStorage.removeItem(DEMO_KEY);
+      } catch {
+        /* ignore */
+      }
+      // Reload back to the public board (also resets the store namespace to live).
+      location.assign(import.meta.env.BASE_URL);
+    };
+    if (wasDemo) {
+      void leaveDemo().finally(finish);
+    } else {
+      setAuthed(false);
+      finish();
     }
   };
 

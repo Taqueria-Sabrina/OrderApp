@@ -71,6 +71,8 @@ const ES: Dict = {
   "login.error": "Código incorrecto",
   "login.public": "← Ver el menú público",
   "logout": "Salir",
+  "demo.banner": "Modo demostración · datos de prueba",
+  "login.demo_hint": "Demo: admin / admin",
 
   "order.name_ph": "Nombre del cliente (opcional)",
   "order.noname": "Sin nombre",
@@ -208,6 +210,8 @@ const EN: Dict = {
   "login.error": "Wrong passcode",
   "login.public": "← View public menu",
   "logout": "Sign out",
+  "demo.banner": "Demo mode · test data",
+  "login.demo_hint": "Demo: admin / admin",
 
   "order.name_ph": "Customer name (optional)",
   "order.noname": "No name",

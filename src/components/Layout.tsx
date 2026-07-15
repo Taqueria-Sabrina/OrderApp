@@ -1,6 +1,7 @@
 import { NavLink, Outlet, Link } from "react-router-dom";
 import { useI18n } from "../lib/i18n";
 import { useAuth } from "../lib/auth";
+import { isDemo } from "../lib/store";
 import LangToggle from "./LangToggle";
 import LiveBadge from "./LiveBadge";
 import Logo from "./Logo";
@@ -20,6 +21,11 @@ export default function Layout() {
     <div className="mx-auto flex h-full max-w-md flex-col bg-cream">
       {/* Festive papel-picado teal edge */}
       <div className="papel h-4 shrink-0 text-teal" />
+      {isDemo && (
+        <div className="shrink-0 bg-amber px-4 py-1.5 text-center text-[11px] font-extrabold uppercase tracking-[0.2em] text-white">
+          {t("demo.banner")}
+        </div>
+      )}
       {/* Global top bar: brand · live status · language */}
       <div className="flex shrink-0 items-center justify-between border-b border-line bg-cream px-4 py-2">
         <Link to="/app">
