@@ -292,8 +292,8 @@ export function useLiveBoard(): BoardSnapshot {
 // `demoCount` is how many demo devices are currently connected (presence).
 // `kicked` flips true on a demo device when the live backend boots it.
 
-type Control = { demoEnabled: boolean; demoCount: number; kicked: boolean };
-let control: Control = { demoEnabled: true, demoCount: 0, kicked: false };
+type Control = { demoEnabled: boolean; demoCount: number; kicked: boolean; staffCount: number };
+let control: Control = { demoEnabled: true, demoCount: 0, kicked: false, staffCount: 0 };
 const controlListeners = new Set<() => void>();
 function setControl(patch: Partial<Control>) {
   control = { ...control, ...patch };
@@ -553,6 +553,31 @@ export function setDemoEnabled(enabled: boolean) {
 /** Live backend: boot every connected demo device right now. */
 export function bootDemo() {
   demoPresence?.send({ type: "broadcast", event: "kick", payload: {} });
+}
+
+// Staff (live/Leo) presence — how many real backend devices are connected.
+// Joined from the Layout only for authed LIVE sessions (not demo, not public).
+let staffPresence: RealtimeChannel | null = null;
+
+export function joinStaffPresence() {
+  if (staffPresence || MODE !== "cloud" || !supabase) return;
+  const key = `${Date.now().toString(36)}-${Math.floor(Math.random() * 1e6).toString(36)}`;
+  staffPresence = supabase.channel("staff-presence", { config: { presence: { key } } });
+  staffPresence
+    .on("presence", { event: "sync" }, () => {
+      if (staffPresence) setControl({ staffCount: Object.keys(staffPresence.presenceState()).length });
+    })
+    .subscribe((status) => {
+      if (status === "SUBSCRIBED") void staffPresence?.track({ at: Date.now() });
+    });
+}
+
+export async function leaveStaffPresence() {
+  if (!staffPresence || !supabase) return;
+  const ch = staffPresence;
+  staffPresence = null;
+  await ch.untrack();
+  await supabase.removeChannel(ch);
 }
 
 /** Is demo access currently enabled? (read live app_state id 1) */

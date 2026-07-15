@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { NavLink, Outlet, Link } from "react-router-dom";
 import { useI18n } from "../lib/i18n";
 import { useAuth } from "../lib/auth";
-import { isDemo, useDemoControl } from "../lib/store";
+import { isDemo, useDemoControl, joinStaffPresence, leaveStaffPresence } from "../lib/store";
 import LangToggle from "./LangToggle";
 import LiveBadge from "./LiveBadge";
 import Logo from "./Logo";
@@ -24,6 +24,15 @@ export default function Layout() {
   useEffect(() => {
     if (isDemo && (kicked || !demoEnabled)) logout();
   }, [kicked, demoEnabled, logout]);
+
+  // Live (Leo) sessions announce themselves so the count shows in Settings.
+  useEffect(() => {
+    if (isDemo) return;
+    joinStaffPresence();
+    return () => {
+      void leaveStaffPresence();
+    };
+  }, []);
 
   return (
     <div className="mx-auto flex h-full max-w-md flex-col bg-cream">

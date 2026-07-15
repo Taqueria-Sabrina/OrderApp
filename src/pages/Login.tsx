@@ -75,7 +75,6 @@ export default function Login() {
           >
             {t("login.enter")}
           </button>
-          <p className="mt-3 text-center text-[11px] font-bold text-ink-soft">{t("login.demo_hint")}</p>
         </form>
 
         <div className="mt-6 text-center">

@@ -60,32 +60,45 @@ function AddItem() {
   );
 }
 
-function DemoControl() {
+function Settings() {
   const { t } = useI18n();
-  const { demoEnabled, demoCount } = useDemoControl();
-  const active = demoCount > 0;
+  const { demoEnabled, demoCount, staffCount } = useDemoControl();
+  const demoActive = demoCount > 0;
 
   return (
     <div className="rounded-2xl border-2 border-line bg-paper p-4 shadow-sm">
-      <p className="mb-3 text-[11px] font-extrabold uppercase tracking-[0.2em] text-teal-deep">{t("menu.demo_title")}</p>
-      <div className="flex items-center justify-between">
-        <span className="font-display text-lg font-black text-ink">{t("menu.demo_toggle")}</span>
-        <Toggle on={demoEnabled} onClick={() => setDemoEnabled(!demoEnabled)} />
+      <p className="mb-3 text-[11px] font-extrabold uppercase tracking-[0.2em] text-teal-deep">{t("menu.settings_title")}</p>
+
+      {/* Staff (Leo account) connected devices */}
+      <div className="flex items-center gap-2">
+        <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-teal" />
+        <span className="text-[13px] font-bold text-ink-soft">{t("menu.staff_connected", { n: staffCount })}</span>
       </div>
-      <div className="mt-3 flex items-center gap-2">
-        <span className={`h-2.5 w-2.5 rounded-full ${active ? "animate-pulse" : ""}`} style={{ backgroundColor: active ? "#c8437f" : "#e2d5dd" }} />
-        <span className="text-[13px] font-bold text-ink-soft">
-          {active ? t("menu.demo_active", { n: demoCount }) : t("menu.demo_none")}
-        </span>
+
+      {/* Demo access */}
+      <div className="mt-4 border-t border-line pt-4">
+        <div className="flex items-center justify-between">
+          <div className="min-w-0">
+            <p className="font-display text-lg font-black text-ink">{t("menu.demo_title")}</p>
+            <p className="text-[12px] text-ink-soft">{t("menu.demo_toggle")}</p>
+          </div>
+          <Toggle on={demoEnabled} onClick={() => setDemoEnabled(!demoEnabled)} />
+        </div>
+        <div className="mt-3 flex items-center gap-2">
+          <span className={`h-2.5 w-2.5 rounded-full ${demoActive ? "animate-pulse" : ""}`} style={{ backgroundColor: demoActive ? "#c8437f" : "#e2d5dd" }} />
+          <span className="text-[13px] font-bold text-ink-soft">
+            {demoActive ? t("menu.demo_active", { n: demoCount }) : t("menu.demo_none")}
+          </span>
+        </div>
+        {demoActive && (
+          <button
+            onClick={bootDemo}
+            className="mt-3 w-full rounded-2xl border-2 border-pink-deep py-2.5 text-sm font-black uppercase tracking-wide text-pink-deep transition active:scale-[0.98]"
+          >
+            {t("menu.demo_boot")}
+          </button>
+        )}
       </div>
-      {active && (
-        <button
-          onClick={bootDemo}
-          className="mt-3 w-full rounded-2xl border-2 border-pink-deep py-2.5 text-sm font-black uppercase tracking-wide text-pink-deep transition active:scale-[0.98]"
-        >
-          {t("menu.demo_boot")}
-        </button>
-      )}
     </div>
   );
 }
@@ -235,10 +248,10 @@ export default function Menu() {
         <AddItem />
       </div>
 
-      {/* Demo access control — live backend only */}
+      {/* Settings (staff-connected + demo access) — live backend only */}
       {!isDemo && (
         <div className="mt-4 px-5">
-          <DemoControl />
+          <Settings />
         </div>
       )}
 
