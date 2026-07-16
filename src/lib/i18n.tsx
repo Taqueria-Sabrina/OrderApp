@@ -127,6 +127,11 @@ const ES: Dict = {
   "pay.cancel": "Cancelar",
   "pay.clear": "Borrar",
 
+  "order.ready_btn": "Listos",
+  "order.ready_title": "Pedidos listos",
+  "order.ready_empty": "No hay pedidos listos",
+  "order.deliver": "Entregado",
+
   "queue.title": "Cocina",
   "queue.sub": ({ n }) => `${n} ticket${Number(n) === 1 ? "" : "s"} · más antiguos primero`,
   "queue.new": "Nuevo",
@@ -287,6 +292,11 @@ const EN: Dict = {
   "pay.back": "← Back",
   "pay.cancel": "Cancel",
   "pay.clear": "Clear",
+
+  "order.ready_btn": "Ready",
+  "order.ready_title": "Ready orders",
+  "order.ready_empty": "No ready orders",
+  "order.deliver": "Delivered",
 
   "queue.title": "Kitchen",
   "queue.sub": ({ n }) => `${n} ticket${Number(n) === 1 ? "" : "s"} · oldest first`,
