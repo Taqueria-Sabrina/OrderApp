@@ -2,8 +2,6 @@ import { createContext, useContext, useState, type ReactNode } from "react";
 
 export type Lang = "es" | "en";
 
-const LANG_KEY = "popup-orders/lang";
-
 /** Currency formatting differs by locale: "3€" (es) vs "€3" (en). */
 export function money(n: number, lang: Lang) {
   const v = Math.round(n);
@@ -332,27 +330,13 @@ type Ctx = {
 
 const I18nContext = createContext<Ctx | null>(null);
 
-function initialLang(): Lang {
-  try {
-    const saved = localStorage.getItem(LANG_KEY);
-    if (saved === "en" || saved === "es") return saved;
-  } catch {
-    /* ignore */
-  }
-  return "es";
-}
-
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [lang, setLangState] = useState<Lang>(initialLang);
+  // Always default to Spanish on load (the stand is in Spain). The EN/ES toggle
+  // still switches for the current session, but it isn't persisted — every fresh
+  // load / new visitor starts in Spanish.
+  const [lang, setLangState] = useState<Lang>("es");
 
-  const setLang = (l: Lang) => {
-    setLangState(l);
-    try {
-      localStorage.setItem(LANG_KEY, l);
-    } catch {
-      /* ignore */
-    }
-  };
+  const setLang = (l: Lang) => setLangState(l);
 
   const t = (key: string, params?: Record<string, string | number>) => {
     const v = DICTS[lang][key] ?? key;
