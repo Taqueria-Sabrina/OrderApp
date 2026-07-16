@@ -3,5 +3,5 @@
 @import "../src/index.css";
 
 @source "../src";
-@source "./designs/canvases";
+@source "./designs";
 /* tempo:managed:end */

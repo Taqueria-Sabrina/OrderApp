@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Cocina · Taqueria Sabrina</title>
+<style>
+/* Plain, Safari-9-safe CSS: no custom properties, no @layer, no color-mix. */
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: #fff6f1; color: #33264a;
+  font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 720px; margin: 0 auto; padding: 12px; }
+.bar { display: block; height: 8px; background: #17b3ab; margin: -12px -12px 12px; }
+h1 { font-size: 22px; margin: 4px 0 2px; color: #c8437f; font-weight: 800; }
+.sub { font-size: 12px; color: #8a7d97; margin: 0 0 14px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; }
+
+/* Login */
+#login { text-align: center; padding: 40px 16px; }
+#login input {
+  width: 100%; max-width: 320px; padding: 14px; font-size: 17px;
+  border: 2px solid #f0e3ea; border-radius: 12px; background: #fff; color: #33264a;
+}
+#login .err { color: #c8437f; font-weight: 700; margin-top: 8px; min-height: 18px; }
+.btn {
+  display: inline-block; border: 0; border-radius: 14px; cursor: pointer;
+  font-size: 16px; font-weight: 800; color: #fff; padding: 14px 18px;
+  text-transform: uppercase; letter-spacing: 0.5px; -webkit-appearance: none;
+}
+.btn-pink { background: #c8437f; }
+#login .btn { margin-top: 14px; width: 100%; max-width: 320px; }
+
+/* Lanes */
+.lane-title { font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; margin: 18px 0 8px; }
+.card { background: #fff; border: 1px solid #f0e3ea; border-left: 5px solid #ccc; border-radius: 14px; padding: 12px 14px; margin-bottom: 10px; }
+.card .top { overflow: hidden; }
+.card .num { font-size: 20px; font-weight: 800; float: left; }
+.card .name { font-size: 15px; font-weight: 700; color: #c8437f; margin-left: 8px; float: left; line-height: 26px; }
+.card .time { float: right; font-size: 12px; color: #8a7d97; line-height: 26px; }
+.card ul { list-style: none; margin: 8px 0 0; padding: 0; clear: both; }
+.card li { font-size: 16px; font-weight: 700; padding: 2px 0; }
+.card li .q { font-weight: 800; margin-right: 8px; }
+.card .note { margin-top: 8px; background: #fdeaf3; color: #c8437f; font-size: 13px; font-weight: 700; padding: 5px 8px; border-radius: 6px; }
+.card .act { margin-top: 10px; width: 100%; }
+.empty { color: #8a7d97; font-weight: 700; text-align: center; border: 2px dashed #f0e3ea; border-radius: 14px; padding: 22px; }
+.hidden { display: none; }
+.foot { text-align: center; color: #8a7d97; font-size: 11px; margin: 20px 0 30px; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #17b3ab; margin-right: 6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <span class="bar"></span>
+
+  <div id="login">
+    <h1>Cocina</h1>
+    <p class="sub">Taqueria Sabrina</p>
+    <form id="loginForm">
+      <input id="pw" type="password" placeholder="Contraseña" autocomplete="current-password">
+      <div class="err" id="err"></div>
+      <button class="btn btn-pink" type="submit">Entrar</button>
+    </form>
+  </div>
+
+  <div id="app" class="hidden">
+    <h1>Cocina</h1>
+    <p class="sub"><span class="dot"></span><span id="status">Conectando…</span></p>
+    <div id="lanes"></div>
+    <p class="foot">Se actualiza solo · modo compatible</p>
+  </div>
+</div>
+
+<script>
+/* Standalone kitchen board for old iOS (Safari 9). Pure ES5, XHR only.
+   Reads/writes the SAME live Supabase orders as the main app. */
+(function () {
+  var SUPA_URL = "https://vwpwykvnhosbazyijiux.supabase.co";
+  var ANON = "sb_publishable_LkmuGdRRiCY0qlbp3B0blA_IvO1PKdx";
+  var PASSWORD_HASH = "a9c92dc7a265d1610c1a9529cac0795c98cb6f6d7eaf9b3c75358921e97a4e49";
+  var AUTH_FLAG = "sabrina-kitchen-auth";
+
+  /* ---- SHA-256 (pure JS, no Web Crypto) ---- */
+  function sha256(ascii) {
+    function rightRotate(value, amount) { return (value >>> amount) | (value << (32 - amount)); }
+    var mathPow = Math.pow;
+    var maxWord = mathPow(2, 32);
+    var result = "";
+    var words = [];
+    var asciiBitLength = ascii.length * 8;
+    var hash = sha256.h = sha256.h || [];
+    var k = sha256.k = sha256.k || [];
+    var primeCounter = k.length;
+    var isComposite = {};
+    for (var candidate = 2; primeCounter < 64; candidate++) {
+      if (!isComposite[candidate]) {
+        for (var i = 0; i < 313; i += candidate) { isComposite[i] = candidate; }
+        hash[primeCounter] = (mathPow(candidate, 0.5) * maxWord) | 0;
+        k[primeCounter++] = (mathPow(candidate, 1 / 3) * maxWord) | 0;
+      }
+    }
+    ascii += "\x80";
+    while (ascii.length % 64 - 56) { ascii += "\x00"; }
+    for (var i = 0; i < ascii.length; i++) {
+      var j = ascii.charCodeAt(i);
+      if (j >> 8) { return; }
+      words[i >> 2] |= j << ((3 - i) % 4) * 8;
+    }
+    words[words.length] = ((asciiBitLength / maxWord) | 0);
+    words[words.length] = (asciiBitLength);
+    for (var j = 0; j < words.length;) {
+      var w = words.slice(j, j += 16);
+      var oldHash = hash;
+      hash = hash.slice(0, 8);
+      for (var i = 0; i < 64; i++) {
+        var w15 = w[i - 15], w2 = w[i - 2];
+        var a = hash[0], e = hash[4];
+        var temp1 = hash[7]
+          + (rightRotate(e, 6) ^ rightRotate(e, 11) ^ rightRotate(e, 25))
+          + ((e & hash[5]) ^ ((~e) & hash[6]))
+          + k[i]
+          + (w[i] = (i < 16) ? w[i] : (
+              w[i - 16]
+              + (rightRotate(w15, 7) ^ rightRotate(w15, 18) ^ (w15 >>> 3))
+              + w[i - 7]
+              + (rightRotate(w2, 17) ^ rightRotate(w2, 19) ^ (w2 >>> 10))
+            ) | 0
+          );
+        var temp2 = (rightRotate(a, 2) ^ rightRotate(a, 13) ^ rightRotate(a, 22))
+          + ((a & hash[1]) ^ (a & hash[2]) ^ (hash[1] & hash[2]));
+        hash = [(temp1 + temp2) | 0].concat(hash);
+        hash[4] = (hash[4] + temp1) | 0;
+      }
+      for (var i = 0; i < 8; i++) { hash[i] = (hash[i] + oldHash[i]) | 0; }
+    }
+    for (var i = 0; i < 8; i++) {
+      for (var j = 3; j + 1; j--) {
+        var b = (hash[i] >> (j * 8)) & 255;
+        result += ((b < 16) ? 0 : "") + b.toString(16);
+      }
+    }
+    return result;
+  }
+
+  /* ---- tiny helpers ---- */
+  function $(id) { return document.getElementById(id); }
+  function xhr(method, url, body, cb) {
+    var r = new XMLHttpRequest();
+    r.open(method, url, true);
+    r.setRequestHeader("apikey", ANON);
+    r.setRequestHeader("Authorization", "Bearer " + ANON);
+    if (body) { r.setRequestHeader("Content-Type", "application/json"); r.setRequestHeader("Prefer", "return=minimal"); }
+    r.onreadystatechange = function () {
+      if (r.readyState === 4) {
+        var data = null;
+        try { data = r.responseText ? JSON.parse(r.responseText) : null; } catch (e) {}
+        cb(r.status >= 200 && r.status < 300, data);
+      }
+    };
+    r.send(body ? JSON.stringify(body) : null);
+  }
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  /* ---- auth ---- */
+  function showApp() { $("login").className = "hidden"; $("app").className = ""; start(); }
+  function tryLogin(pw) { return sha256(pw) === PASSWORD_HASH; }
+
+  try { if (window.sessionStorage && sessionStorage.getItem(AUTH_FLAG) === "1") { showApp(); } } catch (e) {}
+
+  $("loginForm").onsubmit = function (e) {
+    e.preventDefault();
+    if (tryLogin($("pw").value)) {
+      try { sessionStorage.setItem(AUTH_FLAG, "1"); } catch (e2) {}
+      showApp();
+    } else {
+      $("err").innerHTML = "Contraseña incorrecta";
+    }
+  };
+
+  /* ---- data ---- */
+  var menu = {}; // id -> name
+  var LANES = [
+    { status: "new", label: "Nuevo", accent: "#c8437f", next: "cooking", btn: "Empezar a cocinar" },
+    { status: "cooking", label: "Cocinando", accent: "#e79a3a", next: "ready", btn: "Marcar listo" },
+    { status: "ready", label: "Listo", accent: "#17b3ab", next: "done", btn: "Entregado" }
+  ];
+
+  function loadMenu(cb) {
+    xhr("GET", SUPA_URL + "/rest/v1/app_state?id=eq.1&select=menu", null, function (ok, data) {
+      if (ok && data && data[0] && data[0].menu) {
+        menu = {};
+        for (var i = 0; i < data[0].menu.length; i++) { menu[data[0].menu[i].id] = data[0].menu[i].name; }
+      }
+      cb();
+    });
+  }
+
+  function minsAgo(ms) {
+    var s = Math.floor((now() - ms) / 1000);
+    if (s < 60) return "ahora";
+    return "hace " + Math.floor(s / 60) + " min";
+  }
+  function now() { return (new Date()).getTime(); }
+
+  function itemsHtml(items) {
+    var out = "";
+    for (var id in items) {
+      if (items.hasOwnProperty(id)) {
+        out += '<li><span class="q">' + items[id] + '×</span>' + esc(menu[id] || id) + '</li>';
+      }
+    }
+    return out;
+  }
+
+  function render(orders) {
+    var html = "";
+    for (var L = 0; L < LANES.length; L++) {
+      var lane = LANES[L];
+      var cards = [];
+      for (var i = 0; i < orders.length; i++) { if (orders[i].status === lane.status) cards.push(orders[i]); }
+      html += '<div class="lane-title" style="color:' + lane.accent + '">' + lane.label + ' (' + cards.length + ')</div>';
+      if (!cards.length) { html += '<div class="empty">Nada por aquí</div>'; continue; }
+      for (var c = 0; c < cards.length; c++) {
+        var o = cards[c];
+        html += '<div class="card" style="border-left-color:' + lane.accent + '">'
+          + '<div class="top"><span class="num">#' + esc(o.number) + '</span>'
+          + (o.name ? '<span class="name">' + esc(o.name) + '</span>' : '')
+          + '<span class="time">' + minsAgo(o.created_at) + '</span></div>'
+          + '<ul>' + itemsHtml(o.items) + '</ul>'
+          + (o.note ? '<div class="note">' + esc(o.note) + '</div>' : '')
+          + '<button class="btn act" style="background:' + lane.accent + '" data-id="' + esc(o.id)
+          + '" data-next="' + lane.next + '">' + lane.btn + '</button>'
+          + '</div>';
+      }
+    }
+    $("lanes").innerHTML = html;
+
+    var btns = $("lanes").getElementsByTagName("button");
+    for (var b = 0; b < btns.length; b++) {
+      btns[b].onclick = function () { advance(this.getAttribute("data-id"), this.getAttribute("data-next")); };
+    }
+  }
+
+  function advance(id, next) {
+    var body = { status: next };
+    if (next === "done") { body.completed_at = now(); }
+    xhr("PATCH", SUPA_URL + "/rest/v1/orders?id=eq." + encodeURIComponent(id), body, function () { poll(); });
+  }
+
+  function poll() {
+    var url = SUPA_URL + "/rest/v1/orders?select=*&env=eq.live&status=neq.done&order=created_at.asc";
+    xhr("GET", url, null, function (ok, data) {
+      if (ok && data) { $("status").innerHTML = "En vivo · " + data.length + " ticket(s)"; render(data); }
+      else { $("status").innerHTML = "Reintentando…"; }
+    });
+  }
+
+  function start() {
+    loadMenu(function () {
+      poll();
+      setInterval(poll, 4000);
+      setInterval(function () { loadMenu(function () {}); }, 60000);
+    });
+  }
+})();
+</script>
+</body>
+</html>
