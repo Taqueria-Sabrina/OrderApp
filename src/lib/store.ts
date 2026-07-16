@@ -60,6 +60,8 @@ export type Taco = {
 // (picked up) but stays in the order log so sales totals include it.
 export type OrderStatus = "new" | "cooking" | "ready" | "done";
 
+export type PaymentMethod = "cash" | "card";
+
 export type Order = {
   id: string;
   number: number;
@@ -69,6 +71,7 @@ export type Order = {
   status: OrderStatus;
   createdAt: number;
   completedAt?: number; // set when the ticket is picked up / archived
+  payment?: PaymentMethod; // how it was paid (set at checkout)
 };
 
 /** A closed-out service — a snapshot of one day's orders, kept for the record. */
@@ -332,6 +335,7 @@ type OrderRow = {
   status: OrderStatus;
   created_at: number;
   completed_at: number | null;
+  payment?: PaymentMethod | null;
   env?: string;
 };
 
@@ -347,6 +351,7 @@ function orderToRow(o: Order): OrderRow {
     status: o.status,
     created_at: o.createdAt,
     completed_at: o.completedAt ?? null,
+    payment: o.payment ?? null,
     env: ENV, // namespace tag so demo rows never mix with live
   };
 }
@@ -361,6 +366,7 @@ function rowToOrder(r: OrderRow): Order {
     status: r.status,
     createdAt: r.created_at,
     completedAt: r.completed_at ?? undefined,
+    payment: r.payment ?? undefined,
   };
 }
 
@@ -660,7 +666,7 @@ function uid() {
   return `${Date.now().toString(36)}-${Math.floor(Math.random() * 1e6).toString(36)}`;
 }
 
-export function fireOrder(items: Record<string, number>, note: string, name = "") {
+export function fireOrder(items: Record<string, number>, note: string, name = "", payment?: PaymentMethod) {
   const cleaned: Record<string, number> = {};
   for (const [id, qty] of Object.entries(items)) if (qty > 0) cleaned[id] = qty;
   if (Object.keys(cleaned).length === 0) return;
@@ -672,6 +678,7 @@ export function fireOrder(items: Record<string, number>, note: string, name = ""
     note: note.trim(),
     status: "new",
     createdAt: Date.now(),
+    payment,
   };
   const nextNumber = state.nextNumber + 1;
   setState({ ...state, orders: [...state.orders, order], nextNumber });
@@ -967,6 +974,25 @@ export function revenueByTacoOf(orders: Order[], menu: Taco[]) {
 
 export function revenueByTaco(state: State) {
   return revenueByTacoOf(state.orders, state.menu);
+}
+
+/** Split revenue + order count by payment method (cash / card / unknown). */
+export function revenueByPaymentOf(orders: Order[], menu: Taco[]) {
+  const out = {
+    cash: { total: 0, count: 0 },
+    card: { total: 0, count: 0 },
+    unknown: { total: 0, count: 0 },
+  };
+  for (const o of orders) {
+    const bucket = o.payment === "cash" ? out.cash : o.payment === "card" ? out.card : out.unknown;
+    bucket.total += orderTotal(o, menu);
+    bucket.count += 1;
+  }
+  return out;
+}
+
+export function revenueByPayment(state: State) {
+  return revenueByPaymentOf(state.orders, state.menu);
 }
 
 // ---- Storefront schedule helpers ----

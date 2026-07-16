@@ -1,7 +1,130 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useStore, fireOrder, dealPrice, tacoCountOf, alaCarteTotalOf, tacoListTotal } from "../lib/store";
+import { useStore, fireOrder, dealPrice, tacoCountOf, alaCarteTotalOf, tacoListTotal, type PaymentMethod } from "../lib/store";
 import { useI18n } from "../lib/i18n";
+
+/**
+ * Checkout step shown after "Send Order": pick Cash/Card, confirm payment,
+ * then the order fires to the kitchen. Cash shows a numpad to enter the amount
+ * received and computes change. `total` is in whole € (matches money()).
+ */
+function Checkout({ total, onPaid, onClose }: { total: number; onPaid: (m: PaymentMethod) => void; onClose: () => void }) {
+  const { t, money } = useI18n();
+  const [method, setMethod] = useState<PaymentMethod | null>(null);
+  const [received, setReceived] = useState(""); // cash entered, as a string of digits (€)
+
+  const receivedNum = received === "" ? 0 : parseInt(received, 10);
+  const change = receivedNum - total;
+
+  const tapKey = (k: string) => {
+    if (k === "del") return setReceived((r) => r.slice(0, -1));
+    if (k === "clr") return setReceived("");
+    setReceived((r) => (r === "0" ? k : (r + k).slice(0, 5))); // cap at 5 digits
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 sm:items-center" onClick={onClose}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-md rounded-t-3xl border border-line bg-paper p-6 shadow-xl sm:rounded-3xl"
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="font-display text-2xl font-black text-ink">{t("pay.title")}</h2>
+          <span className="font-display text-2xl font-black text-pink-deep">{money(total)}</span>
+        </div>
+
+        {method === null && (
+          <div>
+            <p className="mb-3 text-sm font-semibold text-ink-soft">{t("pay.how")}</p>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => setMethod("cash")}
+                className="rounded-2xl py-6 text-lg font-black uppercase tracking-wide text-white"
+                style={{ backgroundColor: "#17b3ab", boxShadow: "0 6px 0 #0f8f88" }}
+              >
+                {t("pay.cash")}
+              </button>
+              <button
+                onClick={() => setMethod("card")}
+                className="rounded-2xl py-6 text-lg font-black uppercase tracking-wide text-white"
+                style={{ backgroundColor: "#c8437f", boxShadow: "0 6px 0 #96225c" }}
+              >
+                {t("pay.card")}
+              </button>
+            </div>
+            <button onClick={onClose} className="mt-4 w-full py-2 text-sm font-bold text-ink-soft">
+              {t("pay.cancel")}
+            </button>
+          </div>
+        )}
+
+        {method === "card" && (
+          <div>
+            <div className="mb-4 flex items-center justify-between rounded-2xl bg-cream px-4 py-4">
+              <span className="text-sm font-extrabold uppercase tracking-wide text-ink-soft">{t("pay.card")}</span>
+              <span className="font-display text-3xl font-black text-ink">{money(total)}</span>
+            </div>
+            <button
+              onClick={() => onPaid("card")}
+              className="w-full rounded-2xl py-4 text-lg font-black uppercase tracking-wide text-white"
+              style={{ backgroundColor: "#c8437f", boxShadow: "0 6px 0 #96225c" }}
+            >
+              {t("pay.paid")}
+            </button>
+            <button onClick={() => setMethod(null)} className="mt-3 w-full py-2 text-sm font-bold text-ink-soft">
+              {t("pay.back")}
+            </button>
+          </div>
+        )}
+
+        {method === "cash" && (
+          <div>
+            <div className="mb-3 grid grid-cols-3 gap-2 text-center">
+              <div className="rounded-xl bg-cream px-2 py-2">
+                <p className="text-[10px] font-extrabold uppercase tracking-wide text-ink-soft">{t("pay.total")}</p>
+                <p className="font-display text-xl font-black text-ink">{money(total)}</p>
+              </div>
+              <div className="rounded-xl bg-cream px-2 py-2">
+                <p className="text-[10px] font-extrabold uppercase tracking-wide text-ink-soft">{t("pay.received")}</p>
+                <p className="font-display text-xl font-black text-teal-deep">{received === "" ? "—" : money(receivedNum)}</p>
+              </div>
+              <div className="rounded-xl px-2 py-2" style={{ backgroundColor: change >= 0 ? "#e6f6f4" : "#fdeaf3" }}>
+                <p className="text-[10px] font-extrabold uppercase tracking-wide text-ink-soft">{t("pay.change")}</p>
+                <p className="font-display text-xl font-black" style={{ color: change >= 0 ? "#0b6d68" : "#c8437f" }}>
+                  {received === "" ? "—" : money(change)}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              {["1", "2", "3", "4", "5", "6", "7", "8", "9", "clr", "0", "del"].map((k) => (
+                <button
+                  key={k}
+                  onClick={() => tapKey(k)}
+                  className="rounded-xl bg-cream py-4 font-display text-2xl font-black text-ink active:scale-[0.97]"
+                >
+                  {k === "del" ? "⌫" : k === "clr" ? t("pay.clear") : k}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => onPaid("cash")}
+              disabled={receivedNum < total}
+              className="mt-4 w-full rounded-2xl py-4 text-lg font-black uppercase tracking-wide text-white transition disabled:opacity-40"
+              style={{ backgroundColor: "#17b3ab", boxShadow: receivedNum < total ? "none" : "0 6px 0 #0f8f88" }}
+            >
+              {t("pay.paid")}
+            </button>
+            <button onClick={() => setMethod(null)} className="mt-3 w-full py-2 text-sm font-bold text-ink-soft">
+              {t("pay.back")}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function Order() {
   const state = useStore();
@@ -13,6 +136,7 @@ export default function Order() {
   const [name, setName] = useState("");
   const [note, setNote] = useState("");
   const [flash, setFlash] = useState(false);
+  const [checkout, setCheckout] = useState(false);
 
   const set = (id: string, delta: number) =>
     setQty((q) => ({ ...q, [id]: Math.max(0, (q[id] ?? 0) + delta) }));
@@ -23,8 +147,9 @@ export default function Order() {
   const total = dealPrice(tacoQty) + alaCarteTotalOf(qty, state.menu);
   const savings = tacoListTotal(qty, state.menu) - dealPrice(tacoQty);
 
-  const fire = () => {
-    fireOrder(qty, note, name);
+  const fire = (payment: PaymentMethod) => {
+    fireOrder(qty, note, name, payment);
+    setCheckout(false);
     setQty({});
     setName("");
     setNote("");
@@ -126,7 +251,7 @@ export default function Order() {
           <span className="font-display text-3xl font-black text-ink">{money(total)}</span>
         </div>
         <button
-          onClick={fire}
+          onClick={() => setCheckout(true)}
           disabled={items === 0}
           className="w-full rounded-2xl py-4 text-lg font-black uppercase tracking-wide transition disabled:opacity-40"
           style={{
@@ -138,6 +263,8 @@ export default function Order() {
           {flash ? t("order.sent") : t("order.send")}
         </button>
       </div>
+
+      {checkout && <Checkout total={total} onPaid={fire} onClose={() => setCheckout(false)} />}
     </div>
   );
 }

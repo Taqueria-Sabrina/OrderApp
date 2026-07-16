@@ -4,6 +4,7 @@ import {
   soldCounts,
   revenue,
   revenueByTaco,
+  revenueByPayment,
   soldCountsOf,
   revenueOf,
   closeOutDay,
@@ -90,6 +91,7 @@ export default function Dashboard() {
   const totalSold = Object.values(sold).reduce((a, b) => a + b, 0);
   const orders = state.orders.length;
   const rev = revenue(state);
+  const pay = revenueByPayment(state);
   const max = Math.max(1, ...state.menu.map((taco) => sold[taco.id] ?? 0));
 
   const onCloseConfirmed = () => {
@@ -122,6 +124,20 @@ export default function Dashboard() {
             <p className="mt-1 text-xs font-semibold text-ink-soft">{s.sub}</p>
           </div>
         ))}
+      </div>
+
+      {/* Cash / card split */}
+      <div className="mb-6 grid grid-cols-2 gap-3">
+        <div className="rounded-3xl border border-line bg-paper p-5 shadow-sm">
+          <p className="text-xs font-extrabold uppercase tracking-wide text-ink-soft">{t("pay.cash")}</p>
+          <p className="mt-1 font-display text-3xl font-black tabular-nums text-teal-deep">{money(pay.cash.total)}</p>
+          <p className="mt-1 text-xs font-semibold text-ink-soft">{t("dash.orders", { n: pay.cash.count })}</p>
+        </div>
+        <div className="rounded-3xl border border-line bg-paper p-5 shadow-sm">
+          <p className="text-xs font-extrabold uppercase tracking-wide text-ink-soft">{t("pay.card")}</p>
+          <p className="mt-1 font-display text-3xl font-black tabular-nums text-pink-deep">{money(pay.card.total)}</p>
+          <p className="mt-1 text-xs font-semibold text-ink-soft">{t("dash.orders", { n: pay.card.count })}</p>
+        </div>
       </div>
 
       <div className="rounded-3xl border border-line bg-paper p-5 shadow-sm">

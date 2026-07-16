@@ -35,10 +35,12 @@ create table if not exists orders (
   status       text not null default 'new',
   created_at   bigint not null,
   completed_at bigint,
+  payment      text,
   env          text not null default 'live'
 );
--- If orders already exists from an earlier setup, add the column:
-alter table orders add column if not exists env text not null default 'live';
+-- If orders already exists from an earlier setup, add the columns:
+alter table orders add column if not exists env     text not null default 'live';
+alter table orders add column if not exists payment text;
 
 -- Archives: one row per closed-out service (a JSON snapshot of its orders)
 create table if not exists archives (
