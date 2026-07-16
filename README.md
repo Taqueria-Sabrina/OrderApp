@@ -69,7 +69,8 @@ create table if not exists app_state (
   event_date  text    not null default '',
   open_time   text    not null default '21:00',
   close_time  text    not null default '23:00',
-  demo_enabled boolean not null default true
+  demo_enabled boolean not null default true,
+  tacos_sold  int     not null default 325
 );
 -- App state id 1 = live (drives the public homepage); id 2 = the admin/admin
 -- demo sandbox (created automatically on first demo login).
@@ -80,6 +81,7 @@ alter table app_state add column if not exists event_date   text    not null def
 alter table app_state add column if not exists open_time    text    not null default '21:00';
 alter table app_state add column if not exists close_time   text    not null default '23:00';
 alter table app_state add column if not exists demo_enabled boolean not null default true;
+alter table app_state add column if not exists tacos_sold   int     not null default 325;
 
 -- Enable Row Level Security, then allow the anon key full access (prototype:
 -- the app is gated by a client-side crew passcode, not per-user auth).

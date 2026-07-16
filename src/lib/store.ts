@@ -91,6 +91,7 @@ export type State = {
   eventDate: string; // next event date "YYYY-MM-DD" ("" if none set)
   openTime: string; // service start "HH:MM" ("" if none)
   closeTime: string; // service end "HH:MM" ("" if none)
+  tacosSold: number; // cumulative items sold (persists across close-outs; public counter)
 };
 
 const STORAGE_KEY = "popup-orders/v5";
@@ -146,7 +147,9 @@ function seedArchives(): Archive[] {
 }
 
 const DEFAULT_LOCATION = "La Cocina Lot";
-const STOREFRONT_DEFAULTS = { open: true, location: DEFAULT_LOCATION, eventDate: "", openTime: "21:00", closeTime: "23:00" };
+// Live counter seeded at 325 (tacos sold before this feature existed).
+const SEED_TACOS_SOLD = 325;
+const STOREFRONT_DEFAULTS = { open: true, location: DEFAULT_LOCATION, eventDate: "", openTime: "21:00", closeTime: "23:00", tacosSold: SEED_TACOS_SOLD };
 
 function defaultState(): State {
   return { menu: DEFAULT_MENU, orders: seedOrders(), nextNumber: 48, archives: seedArchives(), ...STOREFRONT_DEFAULTS };
@@ -180,6 +183,7 @@ function load(): State {
     if (typeof parsed.eventDate !== "string") parsed.eventDate = "";
     if (typeof parsed.openTime !== "string") parsed.openTime = STOREFRONT_DEFAULTS.openTime;
     if (typeof parsed.closeTime !== "string") parsed.closeTime = STOREFRONT_DEFAULTS.closeTime;
+    if (typeof parsed.tacosSold !== "number") parsed.tacosSold = SEED_TACOS_SOLD;
     parsed.menu = normalizeMenu(parsed.menu);
     return parsed;
   } catch {
@@ -265,10 +269,22 @@ export function useStore(): State {
 // store points at the demo namespace). This is a small separate snapshot bound
 // to app_state id 1, used only by the public MenuBoard.
 
-export type BoardSnapshot = Pick<State, "menu" | "open" | "location" | "eventDate" | "openTime" | "closeTime">;
+export type BoardSnapshot = Pick<
+  State,
+  "menu" | "open" | "location" | "eventDate" | "openTime" | "closeTime" | "orders" | "tacosSold"
+>;
 
 function boardOf(s: Pick<State, keyof BoardSnapshot>): BoardSnapshot {
-  return { menu: s.menu, open: s.open, location: s.location, eventDate: s.eventDate, openTime: s.openTime, closeTime: s.closeTime };
+  return {
+    menu: s.menu,
+    open: s.open,
+    location: s.location,
+    eventDate: s.eventDate,
+    openTime: s.openTime,
+    closeTime: s.closeTime,
+    orders: s.orders,
+    tacosSold: s.tacosSold,
+  };
 }
 
 let board: BoardSnapshot = boardOf(load());
@@ -400,6 +416,7 @@ async function hydrateFromCloud() {
         event_date?: string | null;
         open_time?: string | null;
         close_time?: string | null;
+        tacos_sold?: number | null;
       }
     | null;
 
@@ -416,6 +433,7 @@ async function hydrateFromCloud() {
       event_date: seededStorefront.eventDate,
       open_time: seededStorefront.openTime,
       close_time: seededStorefront.closeTime,
+      tacos_sold: seededStorefront.tacosSold,
     });
     setState({ menu: DEFAULT_MENU, orders: [], nextNumber: 1, archives: [], ...seededStorefront });
     return;
@@ -432,14 +450,19 @@ async function hydrateFromCloud() {
     eventDate: app.event_date ?? "",
     openTime: app.open_time ?? STOREFRONT_DEFAULTS.openTime,
     closeTime: app.close_time ?? STOREFRONT_DEFAULTS.closeTime,
+    tacosSold: app.tacos_sold ?? SEED_TACOS_SOLD,
   });
 }
 
-/** Refresh the always-live public board snapshot from app_state id 1. */
+/** Refresh the always-live public board snapshot from app_state id 1 (+ live
+ *  orders for the "Now Preparing" cards). Always reads the LIVE namespace. */
 async function fetchLiveBoard() {
   if (!supabase) return;
-  const { data } = await supabase.from("app_state").select("*").eq("id", 1).maybeSingle();
-  const app = data as {
+  const [appRes, ordersRes] = await Promise.all([
+    supabase.from("app_state").select("*").eq("id", 1).maybeSingle(),
+    supabase.from("orders").select("*"),
+  ]);
+  const app = appRes.data as {
     menu: Taco[];
     open?: boolean;
     location?: string;
@@ -447,8 +470,14 @@ async function fetchLiveBoard() {
     open_time?: string | null;
     close_time?: string | null;
     demo_enabled?: boolean | null;
+    tacos_sold?: number | null;
   } | null;
   if (!app) return;
+  // Live board only ever shows live-namespace orders (missing env → 'live').
+  const liveOrders = ((ordersRes.data as OrderRow[] | null) ?? [])
+    .filter((r) => (r.env ?? "live") === "live")
+    .map(rowToOrder)
+    .sort((a, b) => a.createdAt - b.createdAt);
   setBoard({
     menu: normalizeMenu(app.menu),
     open: app.open ?? STOREFRONT_DEFAULTS.open,
@@ -456,6 +485,8 @@ async function fetchLiveBoard() {
     eventDate: app.event_date ?? "",
     openTime: app.open_time ?? STOREFRONT_DEFAULTS.openTime,
     closeTime: app.close_time ?? STOREFRONT_DEFAULTS.closeTime,
+    orders: liveOrders,
+    tacosSold: app.tacos_sold ?? SEED_TACOS_SOLD,
   });
   // demo_enabled column may not exist yet (pre-migration) → default enabled.
   setControl({ demoEnabled: app.demo_enabled ?? true });
@@ -681,10 +712,12 @@ export function fireOrder(items: Record<string, number>, note: string, name = ""
     payment,
   };
   const nextNumber = state.nextNumber + 1;
-  setState({ ...state, orders: [...state.orders, order], nextNumber });
+  // Bump the cumulative tacos-sold counter (public board) by this order's tacos.
+  const tacosSold = state.tacosSold + tacoCountOf(cleaned, state.menu);
+  setState({ ...state, orders: [...state.orders, order], nextNumber, tacosSold });
   if (MODE === "cloud" && supabase) {
     push(supabase.from("orders").insert(orderToRow(order)));
-    push(supabase.from("app_state").update({ next_number: nextNumber }).eq("id", APP_STATE_ID));
+    push(supabase.from("app_state").update({ next_number: nextNumber, tacos_sold: tacosSold }).eq("id", APP_STATE_ID));
   }
 }
 

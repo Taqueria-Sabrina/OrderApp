@@ -64,6 +64,15 @@ export default function MenuBoard() {
   const isToday = eventIsToday(state.eventDate);
   const location = state.location.trim();
 
+  // Live orders still in progress (not picked up), oldest first. When staff mark
+  // an order done/picked-up it leaves this list and disappears from the board.
+  const STATUS = {
+    new: { label: t("board.st_new"), color: "#c8437f" },
+    cooking: { label: t("board.st_cooking"), color: "#e79a3a" },
+    ready: { label: t("board.st_ready"), color: "#17b3ab" },
+  } as const;
+  const liveOrders = state.orders.filter((o) => o.status !== "done");
+
   return (
     <div className="min-h-full bg-cream">
       <div className="papel h-4 text-teal" />
@@ -143,6 +152,38 @@ export default function MenuBoard() {
           <span>3×7€</span>
         </div>
 
+        {/* Orders in progress — live from the kitchen. Each card shows the
+            ticket #, name, and current step; disappears when picked up. */}
+        {liveOrders.length > 0 && (
+          <div className="mt-6">
+            <h2 className="mb-3 text-center font-display text-xl font-black text-ink">{t("board.orders_live")}</h2>
+            <div className="space-y-2">
+              {liveOrders.map((o) => {
+                const st = STATUS[o.status as keyof typeof STATUS] ?? STATUS.new;
+                return (
+                  <div
+                    key={o.id}
+                    className="flex items-center justify-between rounded-2xl border-2 bg-paper px-4 py-3 shadow-sm"
+                    style={{ borderColor: `${st.color}55` }}
+                  >
+                    <span className="flex items-baseline gap-2">
+                      <span className="font-display text-lg font-black text-ink">#{o.number}</span>
+                      {o.name && <span className="text-sm font-bold text-ink-soft">{o.name}</span>}
+                    </span>
+                    <span
+                      className="flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-extrabold uppercase tracking-wide"
+                      style={{ backgroundColor: `${st.color}1a`, color: st.color }}
+                    >
+                      {o.status !== "ready" && <span className="h-2 w-2 animate-pulse rounded-full" style={{ backgroundColor: st.color }} />}
+                      {st.label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Other Stuff — non-taco items, a la carte, below the deal */}
         {anyActive && others.length > 0 && (
           <div className="mt-8">
@@ -177,6 +218,12 @@ export default function MenuBoard() {
             Instagram
           </span>
         </a>
+
+        {/* Tacos sold — cumulative counter, always shown */}
+        <div className="mt-6 rounded-2xl bg-teal-soft py-5 text-center">
+          <p className="font-display text-5xl font-black tabular-nums text-teal-deep">{state.tacosSold}</p>
+          <p className="mt-1 text-[11px] font-extrabold uppercase tracking-[0.2em] text-teal-deep">{t("board.sold")}</p>
+        </div>
 
         {/* Discreet staff entrance */}
         <div className="mt-10 text-center">

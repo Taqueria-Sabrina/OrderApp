@@ -41,6 +41,11 @@ const ES: Dict = {
   "board.ig_follow": "Síguenos en Instagram",
   "board.staff": "Entrar (equipo)",
   "board.copyright": "© 2026 Taqueria Sabrina",
+  "board.orders_live": "Pedidos en marcha",
+  "board.st_new": "Enviado a cocina",
+  "board.st_cooking": "Cocinando",
+  "board.st_ready": "¡Listo!",
+  "board.sold": "Tacos vendidos",
 
   "menu.storefront": "Escaparate",
   "menu.open_label": "Abierto ahora",
@@ -207,6 +212,11 @@ const EN: Dict = {
   "board.ig_follow": "Follow us on Instagram",
   "board.staff": "Staff sign in",
   "board.copyright": "© 2026 Taqueria Sabrina",
+  "board.orders_live": "Orders in progress",
+  "board.st_new": "Sent to kitchen",
+  "board.st_cooking": "Now cooking",
+  "board.st_ready": "Ready!",
+  "board.sold": "Tacos sold",
 
   "menu.storefront": "Storefront",
   "menu.open_label": "Open now",
