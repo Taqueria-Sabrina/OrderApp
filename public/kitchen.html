@@ -147,10 +147,13 @@ h1 { font-size: 22px; margin: 4px 0 2px; color: #c8437f; font-weight: 800; }
   /* ---- tiny helpers ---- */
   function $(id) { return document.getElementById(id); }
   function xhr(method, url, body, cb) {
+    // Safari 9 caches XHR GETs hard — no-cache headers + a per-request cache
+    // buster in the query (added by callers as a valid PostgREST filter).
     var r = new XMLHttpRequest();
     r.open(method, url, true);
     r.setRequestHeader("apikey", ANON);
     r.setRequestHeader("Authorization", "Bearer " + ANON);
+    if (method === "GET") { r.setRequestHeader("Cache-Control", "no-cache"); r.setRequestHeader("Pragma", "no-cache"); }
     if (body) { r.setRequestHeader("Content-Type", "application/json"); r.setRequestHeader("Prefer", "return=minimal"); }
     r.onreadystatechange = function () {
       if (r.readyState === 4) {
@@ -189,8 +192,12 @@ h1 { font-size: 22px; margin: 4px 0 2px; color: #c8437f; font-weight: 800; }
     { status: "ready", label: "Listo", accent: "#17b3ab", next: "done", btn: "Entregado" }
   ];
 
+  // A valid PostgREST filter that's always true but varies per request, so the
+  // URL is unique and Safari 9 can't serve a stale cached response.
+  function bust() { return "__cb" + (new Date()).getTime(); }
+
   function loadMenu(cb) {
-    xhr("GET", SUPA_URL + "/rest/v1/app_state?id=eq.1&select=menu", null, function (ok, data) {
+    xhr("GET", SUPA_URL + "/rest/v1/app_state?id=eq.1&select=menu&location=not.eq." + bust(), null, function (ok, data) {
       if (ok && data && data[0] && data[0].menu) {
         menu = {};
         for (var i = 0; i < data[0].menu.length; i++) { menu[data[0].menu[i].id] = data[0].menu[i].name; }
@@ -252,7 +259,7 @@ h1 { font-size: 22px; margin: 4px 0 2px; color: #c8437f; font-weight: 800; }
   }
 
   function poll() {
-    var url = SUPA_URL + "/rest/v1/orders?select=*&env=eq.live&status=neq.done&order=created_at.asc";
+    var url = SUPA_URL + "/rest/v1/orders?select=*&env=eq.live&status=neq.done&order=created_at.asc&id=not.eq." + bust();
     xhr("GET", url, null, function (ok, data) {
       if (ok && data) { $("status").innerHTML = "En vivo · " + data.length + " ticket(s)"; render(data); }
       else { $("status").innerHTML = "Reintentando…"; }
