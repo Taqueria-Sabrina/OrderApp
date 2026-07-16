@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useStore, updateTaco, resetService, setOpen, setLocation, setSchedule, addMenuItem, removeMenuItem, isDemo, useDemoControl, setDemoEnabled, bootDemo, startBoardPresence, stopBoardPresence, fetchVisitsTotal } from "../lib/store";
 import { useI18n } from "../lib/i18n";
 import { ChilliPicker } from "../components/Chilli";
+import LiveBadge from "../components/LiveBadge";
 
 // Half-hour time slots for the service-hours dropdowns (00:00 … 23:30).
 const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
@@ -122,6 +123,11 @@ function Settings() {
             {t("menu.demo_boot")}
           </button>
         )}
+      </div>
+
+      {/* Live status indicator */}
+      <div className="mt-4 flex justify-center border-t border-line pt-4">
+        <LiveBadge />
       </div>
     </div>
   );

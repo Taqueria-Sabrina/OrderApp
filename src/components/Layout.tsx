@@ -1,11 +1,11 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { NavLink, Outlet, Link } from "react-router-dom";
 import { useI18n } from "../lib/i18n";
 import { useAuth } from "../lib/auth";
-import { isDemo, useDemoControl, joinStaffPresence, leaveStaffPresence } from "../lib/store";
+import { isDemo, useDemoControl, useStore, joinStaffPresence, leaveStaffPresence } from "../lib/store";
 import LangToggle from "./LangToggle";
-import LiveBadge from "./LiveBadge";
 import Logo from "./Logo";
+import ReadyPopup from "./ReadyPopup";
 
 const NAV = [
   { to: "/app/order", key: "nav.order" as const, icon: "＋" },
@@ -19,6 +19,9 @@ export default function Layout() {
   const { t } = useI18n();
   const { logout } = useAuth();
   const { demoEnabled, kicked } = useDemoControl();
+  const store = useStore();
+  const [showReady, setShowReady] = useState(false);
+  const ready = store.orders.filter((o) => o.status === "ready");
 
   // Demo session gets booted when the live backend disables demo or hits "boot".
   useEffect(() => {
@@ -43,13 +46,23 @@ export default function Layout() {
           {t("demo.banner")}
         </div>
       )}
-      {/* Global top bar: brand · live status · language */}
+      {/* Global top bar: brand · ready orders · language */}
       <div className="flex shrink-0 items-center justify-between border-b border-line bg-cream px-4 py-2">
         <Link to="/app">
           <Logo size="sm" />
         </Link>
         <div className="flex items-center gap-2">
-          <LiveBadge />
+          <button
+            onClick={() => setShowReady(true)}
+            className="relative flex items-center gap-1.5 rounded-full border-2 border-teal-soft bg-paper px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-wide text-teal-deep active:scale-[0.97]"
+          >
+            {t("order.ready_btn")}
+            {ready.length > 0 && (
+              <span className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-pink-deep px-1 text-[11px] font-black text-white shadow">
+                {ready.length}
+              </span>
+            )}
+          </button>
           <LangToggle />
           <button
             onClick={logout}
@@ -90,6 +103,8 @@ export default function Layout() {
           </NavLink>
         ))}
       </nav>
+
+      {showReady && <ReadyPopup orders={ready} onClose={() => setShowReady(false)} />}
     </div>
   );
 }
