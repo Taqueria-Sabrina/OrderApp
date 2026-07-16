@@ -762,9 +762,15 @@ export function bumpOrder(id: string) {
  * backs its total out of the day's sales. Password-gated in the UI.
  */
 export function deleteOrder(id: string) {
-  setState({ ...state, orders: state.orders.filter((o) => o.id !== id) });
+  const order = state.orders.find((o) => o.id === id);
+  // Cancelling backs the order's tacos out of the cumulative counter (floored at 0).
+  const tacosSold = order
+    ? Math.max(0, state.tacosSold - tacoCountOf(order.items, state.menu))
+    : state.tacosSold;
+  setState({ ...state, orders: state.orders.filter((o) => o.id !== id), tacosSold });
   if (MODE === "cloud" && supabase) {
     push(supabase.from("orders").delete().eq("id", id));
+    if (order) push(supabase.from("app_state").update({ tacos_sold: tacosSold }).eq("id", APP_STATE_ID));
   }
 }
 
