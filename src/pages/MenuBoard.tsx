@@ -34,6 +34,15 @@ function ItemCard({ item, money, soldOut }: { item: Taco; money: (n: number) => 
   );
 }
 
+/** A single white 4-point sparkle for the special-event header. */
+function Star({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="white" aria-hidden="true">
+      <path d="M12 0c.6 6 5.4 11.4 12 12-6.6.6-11.4 6-12 12-.6-6-5.4-11.4-12-12C6.6 11.4 11.4 6 12 0z" />
+    </svg>
+  );
+}
+
 /**
  * Public storefront — no auth. Shows this week's tacos live (sold-out state
  * updates the instant the crew 86's a taco in the back office), today's date,
@@ -58,6 +67,10 @@ export default function MenuBoard() {
   const anyActive = state.menu.some((taco) => taco.active);
   const tacos = state.menu.filter((m) => m.isTaco);
   const others = state.menu.filter((m) => !m.isTaco);
+  // When NO taco is active (a special event with only "other" items), the deal
+  // banner + "Other Stuff" header drop away and the added items become the menu.
+  const hasTacos = tacos.some((m) => m.active);
+  const eventLabel = state.specialEventLabel.trim() || t("board.special_default");
 
   const hours = hoursLabel(state.openTime, state.closeTime);
   const eventDateObj = parseEventDate(state.eventDate);
@@ -128,29 +141,43 @@ export default function MenuBoard() {
           )}
         </header>
 
-        {/* Tacos */}
+        {/* Special-event header — staff toggle, sparkly, sits atop the menu */}
+        {state.specialEvent && (
+          <div className="sparkle-banner relative mb-6 overflow-hidden rounded-2xl px-5 py-5 text-center shadow-md">
+            <Star className="sparkle-star absolute left-4 top-2 h-4 w-4 [animation-delay:0ms]" />
+            <Star className="sparkle-star absolute right-5 top-3 h-3 w-3 [animation-delay:600ms]" />
+            <Star className="sparkle-star absolute bottom-2 left-8 h-3 w-3 [animation-delay:1100ms]" />
+            <Star className="sparkle-star absolute bottom-3 right-8 h-4 w-4 [animation-delay:300ms]" />
+            <p className="relative font-display text-2xl font-black uppercase tracking-wide text-white drop-shadow-sm">
+              {eventLabel}
+            </p>
+          </div>
+        )}
+
+        {/* Menu — tacos lead when any taco is active; for a taco-less special
+            event the "other" items become the menu (no deal, no header). */}
         {anyActive ? (
-          tacos.length > 0 && (
-            <div className="space-y-3">
-              {tacos.map((taco) => (
-                <ItemCard key={taco.id} item={taco} money={money} soldOut={t("board.soldout")} />
-              ))}
-            </div>
-          )
+          <div className="space-y-3">
+            {(hasTacos ? tacos : others).map((item) => (
+              <ItemCard key={item.id} item={item} money={money} soldOut={t("board.soldout")} />
+            ))}
+          </div>
         ) : (
           <p className="rounded-3xl border-2 border-dashed border-line bg-paper py-12 text-center text-base font-bold text-ink-soft">
             {t("board.none")}
           </p>
         )}
 
-        {/* Deal banner (applies to tacos) */}
-        <div className="mt-6 flex items-center justify-center gap-4 rounded-2xl bg-pink-soft py-3 font-display text-xl font-black text-pink-deep">
-          <span>1×3€</span>
-          <span className="text-pink">·</span>
-          <span>2×5€</span>
-          <span className="text-pink">·</span>
-          <span>3×7€</span>
-        </div>
+        {/* Deal banner — only when tacos are actually on the menu */}
+        {hasTacos && (
+          <div className="mt-6 flex items-center justify-center gap-4 rounded-2xl bg-pink-soft py-3 font-display text-xl font-black text-pink-deep">
+            <span>1×3€</span>
+            <span className="text-pink">·</span>
+            <span>2×5€</span>
+            <span className="text-pink">·</span>
+            <span>3×7€</span>
+          </div>
+        )}
 
         {/* Orders in progress — live from the kitchen. Each card shows the
             ticket #, name, and current step; disappears when picked up. */}
@@ -184,8 +211,9 @@ export default function MenuBoard() {
           </div>
         )}
 
-        {/* Other Stuff — non-taco items, a la carte, below the deal */}
-        {anyActive && others.length > 0 && (
+        {/* Other Stuff — secondary section, only when tacos lead the menu
+            (in a taco-less event the items already appear as the menu above). */}
+        {hasTacos && others.length > 0 && (
           <div className="mt-8">
             <h2 className="mb-3 text-center font-display text-2xl font-black text-ink">{t("board.other")}</h2>
             <div className="space-y-3">

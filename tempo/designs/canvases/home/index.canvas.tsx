@@ -13,7 +13,7 @@ export default function HomeCanvas() {
         id="Home"
         name="Home (/)"
         route="/"
-        layout={{ x: 0, y: 278, width: 571, height: 1325 }}
+        layout={{ x: 0, y: 278, width: 518, height: 908 }}
       />
     </Canvas>
   );

@@ -106,6 +106,8 @@ export type State = {
   openTime: string; // service start "HH:MM" ("" if none)
   closeTime: string; // service end "HH:MM" ("" if none)
   tacosSold: number; // cumulative items sold (persists across close-outs; public counter)
+  specialEvent: boolean; // show the sparkly "Special Event" header atop the public board
+  specialEventLabel: string; // the header text (customizable; defaults per-locale)
 };
 
 const STORAGE_KEY = "popup-orders/v5";
@@ -163,7 +165,7 @@ function seedArchives(): Archive[] {
 const DEFAULT_LOCATION = "La Cocina Lot";
 // Live counter seeded at 325 (tacos sold before this feature existed).
 const SEED_TACOS_SOLD = 325;
-const STOREFRONT_DEFAULTS = { open: true, location: DEFAULT_LOCATION, eventDate: "", openTime: "21:00", closeTime: "23:00", tacosSold: SEED_TACOS_SOLD };
+const STOREFRONT_DEFAULTS = { open: true, location: DEFAULT_LOCATION, eventDate: "", openTime: "21:00", closeTime: "23:00", tacosSold: SEED_TACOS_SOLD, specialEvent: false, specialEventLabel: "" };
 
 function defaultState(): State {
   return { menu: DEFAULT_MENU, orders: seedOrders(), nextNumber: 48, archives: seedArchives(), tabs: [], ...STOREFRONT_DEFAULTS };
@@ -198,6 +200,8 @@ function load(): State {
     if (typeof parsed.openTime !== "string") parsed.openTime = STOREFRONT_DEFAULTS.openTime;
     if (typeof parsed.closeTime !== "string") parsed.closeTime = STOREFRONT_DEFAULTS.closeTime;
     if (typeof parsed.tacosSold !== "number") parsed.tacosSold = SEED_TACOS_SOLD;
+    if (typeof parsed.specialEvent !== "boolean") parsed.specialEvent = false;
+    if (typeof parsed.specialEventLabel !== "string") parsed.specialEventLabel = "";
     if (!parsed.tabs) parsed.tabs = [];
     parsed.menu = normalizeMenu(parsed.menu);
     return parsed;
@@ -286,7 +290,7 @@ export function useStore(): State {
 
 export type BoardSnapshot = Pick<
   State,
-  "menu" | "open" | "location" | "eventDate" | "openTime" | "closeTime" | "orders" | "tacosSold"
+  "menu" | "open" | "location" | "eventDate" | "openTime" | "closeTime" | "orders" | "tacosSold" | "specialEvent" | "specialEventLabel"
 >;
 
 function boardOf(s: Pick<State, keyof BoardSnapshot>): BoardSnapshot {
@@ -299,6 +303,8 @@ function boardOf(s: Pick<State, keyof BoardSnapshot>): BoardSnapshot {
     closeTime: s.closeTime,
     orders: s.orders,
     tacosSold: s.tacosSold,
+    specialEvent: s.specialEvent,
+    specialEventLabel: s.specialEventLabel,
   };
 }
 
@@ -436,6 +442,8 @@ async function hydrateFromCloud() {
         close_time?: string | null;
         tacos_sold?: number | null;
         tabs?: Tab[] | null;
+        special_event?: boolean | null;
+        special_event_label?: string | null;
       }
     | null;
 
@@ -454,6 +462,8 @@ async function hydrateFromCloud() {
       close_time: seededStorefront.closeTime,
       tacos_sold: seededStorefront.tacosSold,
       tabs: [],
+      special_event: seededStorefront.specialEvent,
+      special_event_label: seededStorefront.specialEventLabel,
     });
     setState({ menu: DEFAULT_MENU, orders: [], nextNumber: 1, archives: [], tabs: [], ...seededStorefront });
     return;
@@ -472,6 +482,8 @@ async function hydrateFromCloud() {
     openTime: app.open_time ?? STOREFRONT_DEFAULTS.openTime,
     closeTime: app.close_time ?? STOREFRONT_DEFAULTS.closeTime,
     tacosSold: app.tacos_sold ?? SEED_TACOS_SOLD,
+    specialEvent: app.special_event ?? false,
+    specialEventLabel: app.special_event_label ?? "",
   });
 }
 
@@ -492,6 +504,8 @@ async function fetchLiveBoard() {
     close_time?: string | null;
     demo_enabled?: boolean | null;
     tacos_sold?: number | null;
+    special_event?: boolean | null;
+    special_event_label?: string | null;
   } | null;
   if (!app) return;
   // Live board only ever shows live-namespace orders (missing env → 'live').
@@ -508,6 +522,8 @@ async function fetchLiveBoard() {
     closeTime: app.close_time ?? STOREFRONT_DEFAULTS.closeTime,
     orders: liveOrders,
     tacosSold: app.tacos_sold ?? SEED_TACOS_SOLD,
+    specialEvent: app.special_event ?? false,
+    specialEventLabel: app.special_event_label ?? "",
   });
   // demo_enabled column may not exist yet (pre-migration) → default enabled.
   setControl({ demoEnabled: app.demo_enabled ?? true });
@@ -836,6 +852,18 @@ export function setLocation(location: string) {
   }
 }
 
+/** Toggle the sparkly "Special Event" header (and optionally set its text) on
+ *  the public board. Empty label falls back to a per-locale default in the UI. */
+export function setSpecialEvent(specialEvent: boolean, specialEventLabel?: string) {
+  const next = { ...state, specialEvent, ...(specialEventLabel !== undefined ? { specialEventLabel } : {}) };
+  setState(next);
+  if (MODE === "cloud" && supabase) {
+    const row: Record<string, string | boolean> = { special_event: specialEvent };
+    if (specialEventLabel !== undefined) row.special_event_label = specialEventLabel;
+    push(supabase.from("app_state").update(row).eq("id", APP_STATE_ID));
+  }
+}
+
 /** Update the next-event schedule (date + service hours), shown on the board. */
 export function setSchedule(patch: Partial<Pick<State, "eventDate" | "openTime" | "closeTime">>) {
   setState({ ...state, ...patch });
@@ -914,6 +942,8 @@ export function resetService() {
           event_date: STOREFRONT_DEFAULTS.eventDate,
           open_time: STOREFRONT_DEFAULTS.openTime,
           close_time: STOREFRONT_DEFAULTS.closeTime,
+          special_event: STOREFRONT_DEFAULTS.specialEvent,
+          special_event_label: STOREFRONT_DEFAULTS.specialEventLabel,
         })
         .eq("id", APP_STATE_ID),
     );

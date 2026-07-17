@@ -56,6 +56,38 @@ body {
   background-repeat: repeat-x;
 }
 
+/* Special-event header: a shifting festive gradient with a shimmer sweep and
+   twinkling stars. Used on the public board when staff toggle the event on. */
+.sparkle-banner {
+  background: linear-gradient(110deg, #c8437f, #e79a3a, #17b3ab, #c8437f);
+  background-size: 300% 100%;
+  animation: sparkle-shift 6s ease-in-out infinite;
+}
+.sparkle-banner::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.55) 50%, transparent 70%);
+  background-size: 220% 100%;
+  animation: sparkle-sweep 3.2s linear infinite;
+  pointer-events: none;
+}
+.sparkle-star {
+  animation: twinkle 1.8s ease-in-out infinite;
+}
+@keyframes sparkle-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+@keyframes sparkle-sweep {
+  0% { background-position: 120% 0; }
+  100% { background-position: -120% 0; }
+}
+@keyframes twinkle {
+  0%, 100% { opacity: 0.35; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }

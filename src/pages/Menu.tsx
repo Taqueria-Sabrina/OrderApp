@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useStore, updateTaco, resetService, setOpen, setLocation, setSchedule, addMenuItem, removeMenuItem, isDemo, useDemoControl, setDemoEnabled, bootDemo, startBoardPresence, stopBoardPresence, fetchVisitsTotal } from "../lib/store";
+import { useStore, updateTaco, resetService, setOpen, setLocation, setSchedule, setSpecialEvent, addMenuItem, removeMenuItem, isDemo, useDemoControl, setDemoEnabled, bootDemo, startBoardPresence, stopBoardPresence, fetchVisitsTotal } from "../lib/store";
 import { useI18n } from "../lib/i18n";
 import { ChilliPicker } from "../components/Chilli";
 import LiveBadge from "../components/LiveBadge";
@@ -210,6 +210,25 @@ export default function Menu() {
                 ))}
               </select>
             </div>
+          </div>
+
+          {/* Special-event header — sparkly banner at the top of the public menu */}
+          <div className="mt-4 border-t border-line pt-4">
+            <div className="flex items-center justify-between">
+              <div className="min-w-0">
+                <p className="font-display text-lg font-black text-ink">{t("menu.special_title")}</p>
+                <p className="text-[12px] text-ink-soft">{t("menu.special_sub")}</p>
+              </div>
+              <Toggle on={state.specialEvent} onClick={() => setSpecialEvent(!state.specialEvent)} />
+            </div>
+            {state.specialEvent && (
+              <input
+                value={state.specialEventLabel}
+                onChange={(e) => setSpecialEvent(true, e.target.value)}
+                placeholder={t("menu.special_label_ph")}
+                className="mt-3 w-full rounded-xl border-2 border-line bg-cream px-3 py-2.5 text-sm font-semibold text-ink placeholder:text-ink-soft focus:border-teal focus:outline-none"
+              />
+            )}
           </div>
         </div>
       </div>

@@ -74,7 +74,9 @@ create table if not exists app_state (
   close_time  text    not null default '23:00',
   demo_enabled boolean not null default true,
   tacos_sold  int     not null default 325,
-  tabs        jsonb   not null default '[]'
+  tabs        jsonb   not null default '[]',
+  special_event       boolean not null default false,
+  special_event_label text    not null default ''
 );
 -- App state id 1 = live (drives the public homepage); id 2 = the admin/admin
 -- demo sandbox (created automatically on first demo login).
@@ -89,6 +91,10 @@ alter table app_state add column if not exists tacos_sold   int     not null def
 -- Open/closed "pay later" tabs for the day, so the tab list + settlement survive
 -- reloads and sync across devices. The day can't close while any tab is open.
 alter table app_state add column if not exists tabs         jsonb   not null default '[]';
+-- Special-event header shown at the top of the public menu (sparkly banner);
+-- also lets the stand run a menu with no tacos (the deal banner then hides).
+alter table app_state add column if not exists special_event       boolean not null default false;
+alter table app_state add column if not exists special_event_label text    not null default '';
 
 -- Enable Row Level Security, then allow the anon key full access (prototype:
 -- the app is gated by a client-side crew passcode, not per-user auth).
