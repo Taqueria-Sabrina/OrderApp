@@ -60,7 +60,8 @@ export type Taco = {
 // (picked up) but stays in the order log so sales totals include it.
 export type OrderStatus = "new" | "cooking" | "ready" | "done";
 
-export type PaymentMethod = "cash" | "card";
+// cash/card = paid now; later = on an open tab (unpaid); comp = free (0€).
+export type PaymentMethod = "cash" | "card" | "later" | "comp";
 
 export type Order = {
   id: string;
@@ -72,6 +73,17 @@ export type Order = {
   createdAt: number;
   completedAt?: number; // set when the ticket is picked up / archived
   payment?: PaymentMethod; // how it was paid (set at checkout)
+  tabId?: string; // if part of a "pay later" tab
+};
+
+/** A running "pay later" tab — one ticket that accumulates several orders; the
+ *  bundle deal is recomputed across ALL its orders when settled. */
+export type Tab = {
+  id: string;
+  name: string;
+  createdAt: number;
+  status: "open" | "closed";
+  payment?: "cash" | "card" | "comp"; // how it was settled (once closed)
 };
 
 /** A closed-out service — a snapshot of one day's orders, kept for the record. */
@@ -79,6 +91,7 @@ export type Archive = {
   id: string;
   closedAt: number; // when the day was closed out
   orders: Order[]; // the orders that were live when closed
+  tabs?: Tab[]; // the tabs at close-out (for correct grouped pricing later)
 };
 
 export type State = {
@@ -86,6 +99,7 @@ export type State = {
   orders: Order[];
   nextNumber: number;
   archives: Archive[]; // past closed-out services, newest first
+  tabs: Tab[]; // open/closed pay-later tabs for the current day
   open: boolean; // is the stand open right now (shown on the public board)
   location: string; // where the stand is today (shown under the open badge)
   eventDate: string; // next event date "YYYY-MM-DD" ("" if none set)
@@ -152,13 +166,13 @@ const SEED_TACOS_SOLD = 325;
 const STOREFRONT_DEFAULTS = { open: true, location: DEFAULT_LOCATION, eventDate: "", openTime: "21:00", closeTime: "23:00", tacosSold: SEED_TACOS_SOLD };
 
 function defaultState(): State {
-  return { menu: DEFAULT_MENU, orders: seedOrders(), nextNumber: 48, archives: seedArchives(), ...STOREFRONT_DEFAULTS };
+  return { menu: DEFAULT_MENU, orders: seedOrders(), nextNumber: 48, archives: seedArchives(), tabs: [], ...STOREFRONT_DEFAULTS };
 }
 
 /** Cloud mode's starting snapshot before the DB hydrates — no fake seed data,
  *  just the default menu so the first paint isn't empty. */
 function emptyCloudState(): State {
-  return { menu: DEFAULT_MENU, orders: [], nextNumber: 1, archives: [], ...STOREFRONT_DEFAULTS };
+  return { menu: DEFAULT_MENU, orders: [], nextNumber: 1, archives: [], tabs: [], ...STOREFRONT_DEFAULTS };
 }
 
 /** Backfill fields on menus saved before they existed (heat, isTaco). */
@@ -184,6 +198,7 @@ function load(): State {
     if (typeof parsed.openTime !== "string") parsed.openTime = STOREFRONT_DEFAULTS.openTime;
     if (typeof parsed.closeTime !== "string") parsed.closeTime = STOREFRONT_DEFAULTS.closeTime;
     if (typeof parsed.tacosSold !== "number") parsed.tacosSold = SEED_TACOS_SOLD;
+    if (!parsed.tabs) parsed.tabs = [];
     parsed.menu = normalizeMenu(parsed.menu);
     return parsed;
   } catch {
@@ -352,10 +367,11 @@ type OrderRow = {
   created_at: number;
   completed_at: number | null;
   payment?: PaymentMethod | null;
+  tab_id?: string | null;
   env?: string;
 };
 
-type ArchiveRow = { id: string; closed_at: number; orders: Order[] };
+type ArchiveRow = { id: string; closed_at: number; orders: Order[]; tabs?: Tab[] | null };
 
 function orderToRow(o: Order): OrderRow {
   return {
@@ -368,6 +384,7 @@ function orderToRow(o: Order): OrderRow {
     created_at: o.createdAt,
     completed_at: o.completedAt ?? null,
     payment: o.payment ?? null,
+    tab_id: o.tabId ?? null,
     env: ENV, // namespace tag so demo rows never mix with live
   };
 }
@@ -383,6 +400,7 @@ function rowToOrder(r: OrderRow): Order {
     createdAt: r.created_at,
     completedAt: r.completed_at ?? undefined,
     payment: r.payment ?? undefined,
+    tabId: r.tab_id ?? undefined,
   };
 }
 
@@ -404,7 +422,7 @@ async function hydrateFromCloud() {
 
   const archives = ((archivesRes.data as (ArchiveRow & { env?: string | null })[] | null) ?? [])
     .filter(inEnv)
-    .map((r) => ({ id: r.id, closedAt: r.closed_at, orders: r.orders }));
+    .map((r) => ({ id: r.id, closedAt: r.closed_at, orders: r.orders, tabs: r.tabs ?? [] }));
   archives.sort((a, b) => b.closedAt - a.closedAt);
 
   const app = appRes.data as
@@ -417,6 +435,7 @@ async function hydrateFromCloud() {
         open_time?: string | null;
         close_time?: string | null;
         tacos_sold?: number | null;
+        tabs?: Tab[] | null;
       }
     | null;
 
@@ -434,8 +453,9 @@ async function hydrateFromCloud() {
       open_time: seededStorefront.openTime,
       close_time: seededStorefront.closeTime,
       tacos_sold: seededStorefront.tacosSold,
+      tabs: [],
     });
-    setState({ menu: DEFAULT_MENU, orders: [], nextNumber: 1, archives: [], ...seededStorefront });
+    setState({ menu: DEFAULT_MENU, orders: [], nextNumber: 1, archives: [], tabs: [], ...seededStorefront });
     return;
   }
 
@@ -444,6 +464,7 @@ async function hydrateFromCloud() {
     orders,
     nextNumber: app.next_number,
     archives,
+    tabs: app.tabs ?? [],
     // Columns may be absent on a row seeded before these fields existed.
     open: app.open ?? STOREFRONT_DEFAULTS.open,
     location: app.location ?? STOREFRONT_DEFAULTS.location,
@@ -697,7 +718,7 @@ function uid() {
   return `${Date.now().toString(36)}-${Math.floor(Math.random() * 1e6).toString(36)}`;
 }
 
-export function fireOrder(items: Record<string, number>, note: string, name = "", payment?: PaymentMethod) {
+export function fireOrder(items: Record<string, number>, note: string, name = "", payment?: PaymentMethod, tabId?: string) {
   const cleaned: Record<string, number> = {};
   for (const [id, qty] of Object.entries(items)) if (qty > 0) cleaned[id] = qty;
   if (Object.keys(cleaned).length === 0) return;
@@ -710,14 +731,39 @@ export function fireOrder(items: Record<string, number>, note: string, name = ""
     status: "new",
     createdAt: Date.now(),
     payment,
+    tabId,
   };
   const nextNumber = state.nextNumber + 1;
   // Bump the cumulative tacos-sold counter (public board) by this order's tacos.
+  // Every order that reaches the kitchen counts — including comp and pay-later.
   const tacosSold = state.tacosSold + tacoCountOf(cleaned, state.menu);
   setState({ ...state, orders: [...state.orders, order], nextNumber, tacosSold });
   if (MODE === "cloud" && supabase) {
     push(supabase.from("orders").insert(orderToRow(order)));
     push(supabase.from("app_state").update({ next_number: nextNumber, tacos_sold: tacosSold }).eq("id", APP_STATE_ID));
+  }
+}
+
+/** Open a new pay-later tab (named by the customer) and return its id. */
+export function createTab(name: string): string {
+  const tab: Tab = { id: `tab-${uid()}`, name: name.trim() || "Cuenta", createdAt: Date.now(), status: "open" };
+  const tabs = [...state.tabs, tab];
+  setState({ ...state, tabs });
+  if (MODE === "cloud" && supabase) {
+    push(supabase.from("app_state").update({ tabs }).eq("id", APP_STATE_ID));
+  }
+  return tab.id;
+}
+
+/** Settle (close) a tab with a payment method. Its orders stay on the board. */
+export function settleTab(tabId: string, method: "cash" | "card" | "comp") {
+  const tabs = state.tabs.map((tb) => (tb.id === tabId ? { ...tb, status: "closed" as const, payment: method } : tb));
+  // Reflect the settlement on the tab's orders (for records/history).
+  const orders = state.orders.map((o) => (o.tabId === tabId ? { ...o, payment: method } : o));
+  setState({ ...state, tabs, orders });
+  if (MODE === "cloud" && supabase) {
+    push(supabase.from("app_state").update({ tabs }).eq("id", APP_STATE_ID));
+    push(supabase.from("orders").update({ payment: method }).eq("tab_id", tabId));
   }
 }
 
@@ -849,7 +895,7 @@ export function resetService() {
   const orderIds = state.orders.map((o) => o.id);
   const archiveIds = state.archives.map((a) => a.id);
   const fresh: State = MODE === "cloud"
-    ? { menu: DEFAULT_MENU, orders: [], nextNumber: 1, archives: [], ...STOREFRONT_DEFAULTS }
+    ? { menu: DEFAULT_MENU, orders: [], nextNumber: 1, archives: [], tabs: [], ...STOREFRONT_DEFAULTS }
     : defaultState();
   setState(fresh);
   if (MODE === "cloud" && supabase) {
@@ -862,6 +908,7 @@ export function resetService() {
         .update({
           menu: DEFAULT_MENU,
           next_number: 1,
+          tabs: [],
           open: STOREFRONT_DEFAULTS.open,
           location: STOREFRONT_DEFAULTS.location,
           event_date: STOREFRONT_DEFAULTS.eventDate,
@@ -873,27 +920,34 @@ export function resetService() {
   }
 }
 
+/** Any tab still open? The day cannot close out until all tabs are settled. */
+export function hasOpenTabs(state: State): boolean {
+  return state.tabs.some((tb) => tb.status === "open");
+}
+
 /**
- * Close out the day: snapshot every current order into a dated archive (so it
- * shows up under "Past weeks"), then clear the live board and reset ticket
- * numbers. The menu is kept as-is for the next service. No-op if there are no
- * orders to close.
+ * Close out the day: snapshot every current order (and the day's tabs) into a
+ * dated archive, then clear the board + tabs and reset ticket numbers. Refuses
+ * (returns false) if any tab is still open, or if there are no orders.
  */
-export function closeOutDay() {
-  if (state.orders.length === 0) return;
-  const archive: Archive = { id: uid(), closedAt: Date.now(), orders: state.orders };
+export function closeOutDay(): boolean {
+  if (hasOpenTabs(state)) return false; // must settle every tab first
+  if (state.orders.length === 0) return false;
+  const archive: Archive = { id: uid(), closedAt: Date.now(), orders: state.orders, tabs: state.tabs };
   setState({
     ...state,
     orders: [],
     nextNumber: 1,
+    tabs: [],
     archives: [archive, ...state.archives],
   });
   if (MODE === "cloud" && supabase) {
     const orderIds = archive.orders.map((o) => o.id);
-    push(supabase.from("archives").insert({ id: archive.id, closed_at: archive.closedAt, orders: archive.orders, env: ENV }));
+    push(supabase.from("archives").insert({ id: archive.id, closed_at: archive.closedAt, orders: archive.orders, tabs: archive.tabs, env: ENV }));
     if (orderIds.length) push(supabase.from("orders").delete().in("id", orderIds));
-    push(supabase.from("app_state").update({ next_number: 1 }).eq("id", APP_STATE_ID));
+    push(supabase.from("app_state").update({ next_number: 1, tabs: [] }).eq("id", APP_STATE_ID));
   }
+  return true;
 }
 
 /** Permanently remove one archived service (e.g. to clear a test run). */
@@ -982,56 +1036,114 @@ export function tacoListTotal(items: Record<string, number>, menu: Taco[]): numb
   return total;
 }
 
-export function revenueOf(orders: Order[], menu: Taco[]) {
-  return orders.reduce((sum, o) => sum + orderTotal(o, menu), 0);
+/** Orders belonging to a tab. */
+export function tabOrdersOf(tabId: string, orders: Order[]): Order[] {
+  return orders.filter((o) => o.tabId === tabId);
+}
+
+/** Combined price for a set of orders billed as ONE ticket: the deal is applied
+ *  to the total taco count across them (so 3+1+2 tacos = two 3-packs) + a la carte. */
+export function tabTotalOf(orders: Order[], menu: Taco[]): number {
+  let tacos = 0;
+  let ala = 0;
+  for (const o of orders) {
+    tacos += tacoCountOf(o.items, menu);
+    ala += alaCarteTotalOf(o.items, menu);
+  }
+  return dealPrice(tacos) + ala;
+}
+
+/** Price of a standalone order (comp → 0). Tab orders are priced at tab level. */
+function standalonePrice(o: Order, menu: Taco[]): number {
+  return o.payment === "comp" ? 0 : orderTotal(o, menu);
+}
+
+// Split orders into billing "units": each standalone order on its own; each tab
+// as one unit of all its orders. Returns { orders, comp } per unit.
+function billingUnits(orders: Order[], tabs: Tab[]): { orders: Order[]; comp: boolean }[] {
+  const tabById = new Map(tabs.map((tb) => [tb.id, tb]));
+  const groups = new Map<string, Order[]>();
+  const units: { orders: Order[]; comp: boolean }[] = [];
+  for (const o of orders) {
+    if (o.tabId && tabById.has(o.tabId)) {
+      const g = groups.get(o.tabId) ?? [];
+      g.push(o);
+      groups.set(o.tabId, g);
+    } else {
+      units.push({ orders: [o], comp: o.payment === "comp" });
+    }
+  }
+  for (const [tabId, ords] of groups) units.push({ orders: ords, comp: tabById.get(tabId)?.payment === "comp" });
+  return units;
+}
+
+export function revenueOf(orders: Order[], menu: Taco[], tabs: Tab[] = []) {
+  return billingUnits(orders, tabs).reduce((sum, u) => sum + (u.comp ? 0 : tabTotalOf(u.orders, menu)), 0);
 }
 
 export function revenue(state: State) {
-  return revenueOf(state.orders, state.menu);
+  return revenueOf(state.orders, state.menu, state.tabs);
 }
 
-/** Revenue attributed to each item so the parts sum to total revenue: taco
- *  items split their order's bundle price by taco-quantity share; non-taco
- *  items get their own price × qty. */
-export function revenueByTacoOf(orders: Order[], menu: Taco[]) {
+/** Revenue attributed to each item so the parts sum to total revenue. Priced by
+ *  billing unit (standalone order or whole tab); comped units contribute 0. */
+export function revenueByTacoOf(orders: Order[], menu: Taco[], tabs: Tab[] = []) {
   const byId = Object.fromEntries(menu.map((t) => [t.id, t]));
   const out: Record<string, number> = {};
-  for (const o of orders) {
-    const tacoQ = tacoCountOf(o.items, menu);
+  for (const unit of billingUnits(orders, tabs)) {
+    if (unit.comp) continue;
+    const combined: Record<string, number> = {};
+    for (const o of unit.orders) for (const [id, n] of Object.entries(o.items)) combined[id] = (combined[id] ?? 0) + n;
+    const tacoQ = tacoCountOf(combined, menu);
     const dealPart = dealPrice(tacoQ);
-    for (const [id, n] of Object.entries(o.items)) {
+    for (const [id, n] of Object.entries(combined)) {
       const item = byId[id];
-      if (item && !item.isTaco) {
-        out[id] = (out[id] ?? 0) + item.price * n;
-      } else if (tacoQ > 0) {
-        out[id] = (out[id] ?? 0) + dealPart * (n / tacoQ);
-      }
+      if (item && !item.isTaco) out[id] = (out[id] ?? 0) + item.price * n;
+      else if (tacoQ > 0) out[id] = (out[id] ?? 0) + dealPart * (n / tacoQ);
     }
   }
   return out;
 }
 
 export function revenueByTaco(state: State) {
-  return revenueByTacoOf(state.orders, state.menu);
+  return revenueByTacoOf(state.orders, state.menu, state.tabs);
 }
 
-/** Split revenue + order count by payment method (cash / card / unknown). */
-export function revenueByPaymentOf(orders: Order[], menu: Taco[]) {
+/** Split revenue + order count by settlement: cash / card / comp / later
+ *  (open tabs, owed) / unknown. Tab orders take the tab's method (open → later). */
+export function revenueByPaymentOf(orders: Order[], menu: Taco[], tabs: Tab[] = []) {
   const out = {
     cash: { total: 0, count: 0 },
     card: { total: 0, count: 0 },
+    comp: { total: 0, count: 0 },
+    later: { total: 0, count: 0 },
     unknown: { total: 0, count: 0 },
   };
+  const tabById = new Map(tabs.map((tb) => [tb.id, tb]));
+  const groups = new Map<string, Order[]>();
   for (const o of orders) {
-    const bucket = o.payment === "cash" ? out.cash : o.payment === "card" ? out.card : out.unknown;
-    bucket.total += orderTotal(o, menu);
-    bucket.count += 1;
+    if (o.tabId && tabById.has(o.tabId)) {
+      const g = groups.get(o.tabId) ?? [];
+      g.push(o);
+      groups.set(o.tabId, g);
+      continue;
+    }
+    const key: keyof typeof out =
+      o.payment === "cash" ? "cash" : o.payment === "card" ? "card" : o.payment === "comp" ? "comp" : o.payment === "later" ? "later" : "unknown";
+    out[key].total += standalonePrice(o, menu);
+    out[key].count += 1;
+  }
+  for (const [tabId, ords] of groups) {
+    const tab = tabById.get(tabId)!;
+    const key: keyof typeof out = tab.status === "open" ? "later" : tab.payment === "comp" ? "comp" : tab.payment === "card" ? "card" : "cash";
+    out[key].total += tab.payment === "comp" ? 0 : tabTotalOf(ords, menu);
+    out[key].count += ords.length;
   }
   return out;
 }
 
 export function revenueByPayment(state: State) {
-  return revenueByPaymentOf(state.orders, state.menu);
+  return revenueByPaymentOf(state.orders, state.menu, state.tabs);
 }
 
 // ---- Storefront schedule helpers ----

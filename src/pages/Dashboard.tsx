@@ -8,6 +8,7 @@ import {
   soldCountsOf,
   revenueOf,
   closeOutDay,
+  hasOpenTabs,
   deleteArchive,
   type Archive,
 } from "../lib/store";
@@ -21,7 +22,7 @@ function ArchiveRow({ archive }: { archive: Archive }) {
   const [open, setOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const sold = soldCountsOf(archive.orders);
-  const rev = revenueOf(archive.orders, state.menu);
+  const rev = revenueOf(archive.orders, state.menu, archive.tabs ?? []);
   const totalSold = Object.values(sold).reduce((a, b) => a + b, 0);
 
   return (
@@ -93,11 +94,14 @@ export default function Dashboard() {
   const rev = revenue(state);
   const pay = revenueByPayment(state);
   const max = Math.max(1, ...state.menu.map((taco) => sold[taco.id] ?? 0));
+  const openTabs = state.tabs.filter((tb) => tb.status === "open").length;
+  const tabsBlock = hasOpenTabs(state);
 
   const onCloseConfirmed = () => {
-    closeOutDay();
-    setFlash(true);
-    setTimeout(() => setFlash(false), 1600);
+    if (closeOutDay()) {
+      setFlash(true);
+      setTimeout(() => setFlash(false), 1600);
+    }
   };
 
   return (
@@ -139,6 +143,22 @@ export default function Dashboard() {
           <p className="mt-1 text-xs font-semibold text-ink-soft">{t("dash.orders", { n: pay.card.count })}</p>
         </div>
       </div>
+
+      {/* Tabs (pay later) + comps — only shown when there's something to report */}
+      {(pay.later.count > 0 || pay.comp.count > 0) && (
+        <div className="mb-6 grid grid-cols-2 gap-3">
+          <div className="rounded-3xl border-2 border-dashed p-5 shadow-sm" style={{ borderColor: "#e79a3a" }}>
+            <p className="text-xs font-extrabold uppercase tracking-wide" style={{ color: "#b7791f" }}>{t("pay.later")}</p>
+            <p className="mt-1 font-display text-3xl font-black tabular-nums" style={{ color: "#b7791f" }}>{money(pay.later.total)}</p>
+            <p className="mt-1 text-xs font-semibold text-ink-soft">{t("dash.orders", { n: pay.later.count })}</p>
+          </div>
+          <div className="rounded-3xl border border-line bg-paper p-5 shadow-sm">
+            <p className="text-xs font-extrabold uppercase tracking-wide text-ink-soft">{t("pay.comp")}</p>
+            <p className="mt-1 font-display text-3xl font-black tabular-nums text-ink-soft">{money(pay.comp.total)}</p>
+            <p className="mt-1 text-xs font-semibold text-ink-soft">{t("dash.orders", { n: pay.comp.count })}</p>
+          </div>
+        </div>
+      )}
 
       <div className="rounded-3xl border border-line bg-paper p-5 shadow-sm">
         <h2 className="mb-4 font-display text-xl font-black text-ink">{t("dash.sold_by")}</h2>
@@ -187,10 +207,15 @@ export default function Dashboard() {
       </section>
 
       {/* Close out the day */}
+      {tabsBlock && (
+        <p className="mt-8 rounded-2xl border-2 border-dashed p-3 text-center text-sm font-bold" style={{ borderColor: "#e79a3a", color: "#b7791f" }}>
+          {t("tabs.close_blocked", { n: openTabs })}
+        </p>
+      )}
       <button
         onClick={() => setShowClose(true)}
-        disabled={orders === 0}
-        className="mt-8 w-full rounded-2xl border-2 border-pink-deep py-3.5 text-sm font-black uppercase tracking-wide text-pink-deep transition active:scale-[0.98] disabled:opacity-40"
+        disabled={orders === 0 || tabsBlock}
+        className={`w-full rounded-2xl border-2 border-pink-deep py-3.5 text-sm font-black uppercase tracking-wide text-pink-deep transition active:scale-[0.98] disabled:opacity-40 ${tabsBlock ? "mt-3" : "mt-8"}`}
       >
         {t("dash.close_day")}
       </button>
