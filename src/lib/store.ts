@@ -960,23 +960,34 @@ export function hasOpenTabs(state: State): boolean {
  * dated archive, then clear the board + tabs and reset ticket numbers. Refuses
  * (returns false) if any tab is still open, or if there are no orders.
  */
-export function closeOutDay(): boolean {
+export async function closeOutDay(): Promise<boolean> {
   if (hasOpenTabs(state)) return false; // must settle every tab first
   if (state.orders.length === 0) return false;
   const archive: Archive = { id: uid(), closedAt: Date.now(), orders: state.orders, tabs: state.tabs };
-  setState({
-    ...state,
-    orders: [],
-    nextNumber: 1,
-    tabs: [],
-    archives: [archive, ...state.archives],
-  });
+  const clear = () =>
+    setState({ ...state, orders: [], nextNumber: 1, tabs: [], archives: [archive, ...state.archives] });
+
   if (MODE === "cloud" && supabase) {
+    // CRITICAL: persist the archive FIRST and confirm it saved before we delete
+    // the day's orders. If this insert fails (e.g. a schema mismatch) we abort
+    // with the board untouched — a failed archive must never destroy the orders.
+    const { error } = await supabase
+      .from("archives")
+      .insert({ id: archive.id, closed_at: archive.closedAt, orders: archive.orders, tabs: archive.tabs, env: ENV });
+    if (error) {
+      console.error("[store] close-out ABORTED — archive save failed, orders preserved:", error);
+      return false;
+    }
+    // Archive is safely stored; now it's safe to clear the board.
+    clear();
     const orderIds = archive.orders.map((o) => o.id);
-    push(supabase.from("archives").insert({ id: archive.id, closed_at: archive.closedAt, orders: archive.orders, tabs: archive.tabs, env: ENV }));
     if (orderIds.length) push(supabase.from("orders").delete().in("id", orderIds));
     push(supabase.from("app_state").update({ next_number: 1, tabs: [] }).eq("id", APP_STATE_ID));
+    return true;
   }
+
+  // Local mode (no cloud): nothing external to fail.
+  clear();
   return true;
 }
 

@@ -50,9 +50,14 @@ create table if not exists archives (
   id        text primary key,
   closed_at bigint not null,
   orders    jsonb  not null default '[]',
+  tabs      jsonb  not null default '[]',
   env       text not null default 'live'
 );
-alter table archives add column if not exists env text not null default 'live';
+alter table archives add column if not exists env  text not null default 'live';
+-- tabs snapshots the day's pay-later tabs alongside its orders so archived
+-- grouped (tab) pricing stays correct. REQUIRED: without it, closing the day
+-- fails to save the archive.
+alter table archives add column if not exists tabs jsonb not null default '[]';
 
 -- Visits: one row per unique device that opens the public homepage (simple
 -- analytics; total shown in the Leo backend Settings panel).

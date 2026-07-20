@@ -87,6 +87,7 @@ export default function Dashboard() {
   const { t, money } = useI18n();
   const [showClose, setShowClose] = useState(false);
   const [flash, setFlash] = useState(false);
+  const [failed, setFailed] = useState(false);
   const sold = soldCounts(state);
   const byTaco = revenueByTaco(state);
   const totalSold = Object.values(sold).reduce((a, b) => a + b, 0);
@@ -97,10 +98,15 @@ export default function Dashboard() {
   const openTabs = state.tabs.filter((tb) => tb.status === "open").length;
   const tabsBlock = hasOpenTabs(state);
 
-  const onCloseConfirmed = () => {
-    if (closeOutDay()) {
+  const onCloseConfirmed = async () => {
+    setFailed(false);
+    if (await closeOutDay()) {
       setFlash(true);
       setTimeout(() => setFlash(false), 1600);
+    } else {
+      // Archive save failed — the board is intentionally left untouched so no
+      // orders are lost. Tell the crew instead of silently doing nothing.
+      setFailed(true);
     }
   };
 
@@ -114,6 +120,12 @@ export default function Dashboard() {
       {flash && (
         <p className="mb-4 rounded-2xl bg-teal-soft p-3 text-center text-sm font-black text-teal-deep">
           {t("dash.closed")}
+        </p>
+      )}
+
+      {failed && (
+        <p className="mb-4 rounded-2xl bg-pink-soft p-3 text-center text-sm font-black text-pink-deep">
+          {t("dash.close_failed")}
         </p>
       )}
 

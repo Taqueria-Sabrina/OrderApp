@@ -188,6 +188,7 @@ const ES: Dict = {
   "dash.close_cancel": "Cancelar",
   "dash.close_error": "Código incorrecto",
   "dash.closed": "¡Día cerrado y archivado! ✓",
+  "dash.close_failed": "No se pudo guardar el archivo. El día NO se cerró y no se ha borrado ningún pedido. Inténtalo de nuevo.",
 
   "dash.past_weeks": "Semanas Anteriores",
   "dash.past_empty": "Aún no hay servicios archivados.",
@@ -376,6 +377,7 @@ const EN: Dict = {
   "dash.close_cancel": "Cancel",
   "dash.close_error": "Wrong passcode",
   "dash.closed": "Day closed & archived! ✓",
+  "dash.close_failed": "Couldn't save the archive. The day was NOT closed and no orders were deleted. Please try again.",
 
   "dash.past_weeks": "Past Weeks",
   "dash.past_empty": "No archived services yet.",
