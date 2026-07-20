@@ -53,7 +53,8 @@ export type Taco = {
   tint: string; // brand color that stands in for the item visually
   heat: number; // chilli rating 0–3, shown on the public board
   isTaco: boolean; // in the taco bundle deal? (false = a la carte)
-  active: boolean;
+  active: boolean; // ON THE MENU — false hides it from the public board entirely
+  soldOut: boolean; // shown but grayed "sold out"; independent of `active`
 };
 
 // "done" is a terminal, archived state: the ticket has left the live queue
@@ -114,10 +115,10 @@ const STORAGE_KEY = "popup-orders/v5";
 const CHANNEL = "popup-orders";
 
 const DEFAULT_MENU: Taco[] = [
-  { id: "tortillero", name: "Tortillero", note: "tortilla de papas, chimichurri y crujiente de maíz", price: 3, tint: "#17b3ab", heat: 0, isTaco: true, active: true },
-  { id: "adobada", name: "Adobada", note: "soja en chile guajillo y pasilla, salsa verde y cebolla", price: 3, tint: "#c8437f", heat: 2, isTaco: true, active: true },
-  { id: "tinga", name: "Tinga", note: "soja en chipotle, crema y lechuga crujiente", price: 3, tint: "#ef92c0", heat: 1, isTaco: true, active: true },
-  { id: "bbq", name: "BBQ", note: "Heura en salsa barbacoa casera, dulce y picante", price: 3, tint: "#e79a3a", heat: 2, isTaco: true, active: true },
+  { id: "tortillero", name: "Tortillero", note: "tortilla de papas, chimichurri y crujiente de maíz", price: 3, tint: "#17b3ab", heat: 0, isTaco: true, active: true, soldOut: false },
+  { id: "adobada", name: "Adobada", note: "soja en chile guajillo y pasilla, salsa verde y cebolla", price: 3, tint: "#c8437f", heat: 2, isTaco: true, active: true, soldOut: false },
+  { id: "tinga", name: "Tinga", note: "soja en chipotle, crema y lechuga crujiente", price: 3, tint: "#ef92c0", heat: 1, isTaco: true, active: true, soldOut: false },
+  { id: "bbq", name: "BBQ", note: "Heura en salsa barbacoa casera, dulce y picante", price: 3, tint: "#e79a3a", heat: 2, isTaco: true, active: true, soldOut: false },
 ];
 
 function seedOrders(): Order[] {
@@ -183,6 +184,8 @@ function normalizeMenu(menu: Taco[]): Taco[] {
     ...t,
     heat: typeof t.heat === "number" ? t.heat : 0,
     isTaco: typeof t.isTaco === "boolean" ? t.isTaco : true,
+    active: typeof t.active === "boolean" ? t.active : true,
+    soldOut: typeof t.soldOut === "boolean" ? t.soldOut : false,
   }));
 }
 
@@ -900,6 +903,7 @@ export function addMenuItem(name: string, isTaco: boolean) {
     heat: 0,
     isTaco,
     active: true,
+    soldOut: false,
   };
   const menu = [...state.menu, item];
   setState({ ...state, menu });

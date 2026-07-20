@@ -11,7 +11,7 @@ function ItemCard({ item, money, soldOut }: { item: Taco; money: (n: number) => 
   return (
     <div
       className="flex items-center gap-4 rounded-3xl border-2 bg-paper p-4 shadow-sm"
-      style={{ borderColor: item.active ? `${item.tint}55` : "#f0e3ea", opacity: item.active ? 1 : 0.55 }}
+      style={{ borderColor: item.soldOut ? "#f0e3ea" : `${item.tint}55`, opacity: item.soldOut ? 0.55 : 1 }}
     >
       <span className="h-12 w-2 shrink-0 rounded-full" style={{ backgroundColor: item.tint }} />
       <div className="min-w-0 flex-1">
@@ -21,13 +21,13 @@ function ItemCard({ item, money, soldOut }: { item: Taco; money: (n: number) => 
         </div>
         {item.note && <p className="mt-0.5 text-[13px] leading-snug text-ink-soft">{item.note}</p>}
       </div>
-      {item.active ? (
-        <span className="font-display text-2xl font-black" style={{ color: item.tint }}>
-          {money(item.price)}
-        </span>
-      ) : (
+      {item.soldOut ? (
         <span className="rounded-full bg-cream px-3 py-1 text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">
           {soldOut}
+        </span>
+      ) : (
+        <span className="font-display text-2xl font-black" style={{ color: item.tint }}>
+          {money(item.price)}
         </span>
       )}
     </div>
@@ -64,12 +64,15 @@ export default function MenuBoard() {
   }, []);
 
   const today = longDate(new Date());
-  const anyActive = state.menu.some((taco) => taco.active);
-  const tacos = state.menu.filter((m) => m.isTaco);
-  const others = state.menu.filter((m) => !m.isTaco);
-  // When NO taco is active (a special event with only "other" items), the deal
-  // banner + "Other Stuff" header drop away and the added items become the menu.
-  const hasTacos = tacos.some((m) => m.active);
+  // Only items that are ON THE MENU (active) appear at all. "Sold out" is a
+  // separate flag handled per-card (grayed) and does NOT remove the item.
+  const onMenu = state.menu.filter((m) => m.active);
+  const anyActive = onMenu.length > 0;
+  const tacos = onMenu.filter((m) => m.isTaco);
+  const others = onMenu.filter((m) => !m.isTaco);
+  // When NO taco is on the menu (a special event with only "other" items), the
+  // deal banner + "Other Stuff" header drop away and the added items are it.
+  const hasTacos = tacos.length > 0;
   const eventLabel = state.specialEventLabel.trim() || t("board.special_default");
 
   const hours = hoursLabel(state.openTime, state.closeTime);

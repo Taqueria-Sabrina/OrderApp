@@ -264,7 +264,16 @@ export default function Menu() {
                   />
                 </div>
               </div>
-              <Toggle on={taco.active} onClick={() => updateTaco(taco.id, { active: !taco.active })} />
+              <div className="flex shrink-0 flex-col items-end gap-2">
+                <label className="flex items-center gap-2">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wide text-ink-soft">{t("menu.on_menu")}</span>
+                  <Toggle on={taco.active} onClick={() => updateTaco(taco.id, { active: !taco.active })} />
+                </label>
+                <label className="flex items-center gap-2">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wide text-ink-soft">{t("board.soldout")}</span>
+                  <Toggle on={taco.soldOut} onClick={() => updateTaco(taco.id, { soldOut: !taco.soldOut })} />
+                </label>
+              </div>
             </div>
             <div className="mt-3 flex items-center gap-3">
               <div className="flex items-center rounded-xl bg-cream px-3 py-2">
