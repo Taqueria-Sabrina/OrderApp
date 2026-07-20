@@ -87,6 +87,18 @@ export type Tab = {
   payment?: "cash" | "card" | "comp"; // how it was settled (once closed)
 };
 
+/** A soft-deleted thing kept in the `recovery` table so it can be restored.
+ *  Every destructive action writes one of these BEFORE deleting the real row. */
+export type RecoveryKind = "order" | "menu_item" | "archive";
+export type RecoveryEntry = {
+  id: string; // recovery row id (uuid)
+  kind: RecoveryKind;
+  refId: string; // original id of the deleted thing
+  payload: Order | Taco | Archive; // full snapshot to restore from
+  deletedAt: number;
+  reason: string;
+};
+
 /** A closed-out service — a snapshot of one day's orders, kept for the record. */
 export type Archive = {
   id: string;
@@ -737,6 +749,93 @@ function uid() {
   return `${Date.now().toString(36)}-${Math.floor(Math.random() * 1e6).toString(36)}`;
 }
 
+// ---- Recovery log (soft-delete safety net) ----
+//
+// Nothing is ever hard-deleted from the DB until a full copy is safely written
+// to the `recovery` table. Because the DB is the source of truth and realtime
+// re-hydrates every device from it, an optimistic local removal that isn't
+// followed by a confirmed DB delete simply heals itself on the next sync — so a
+// failed recovery-save can never lose data. Restores read straight back.
+
+/** Save one snapshot to the recovery table. Returns true only once it's stored
+ *  (local mode has no server, so it's a no-op success). */
+async function recordTrash(kind: RecoveryKind, refId: string, payload: unknown, reason: string): Promise<boolean> {
+  if (MODE !== "cloud" || !supabase) return true;
+  const { error } = await supabase
+    .from("recovery")
+    .insert({ kind, ref_id: refId, payload, env: ENV, deleted_at: Date.now(), reason });
+  if (error) {
+    console.error("[store] recovery save failed — delete aborted:", error);
+    return false;
+  }
+  return true;
+}
+
+/** Batch version for bulk clears (reset). All-or-nothing. */
+async function recordTrashMany(rows: { kind: RecoveryKind; refId: string; payload: unknown; reason: string }[]): Promise<boolean> {
+  if (MODE !== "cloud" || !supabase) return true;
+  if (rows.length === 0) return true;
+  const now = Date.now();
+  const { error } = await supabase
+    .from("recovery")
+    .insert(rows.map((r) => ({ kind: r.kind, ref_id: r.refId, payload: r.payload, env: ENV, deleted_at: now, reason: r.reason })));
+  if (error) {
+    console.error("[store] recovery bulk save failed — clear aborted:", error);
+    return false;
+  }
+  return true;
+}
+
+type RecoveryRow = { id: string; kind: RecoveryKind; ref_id: string; payload: Order | Taco | Archive; deleted_at: number; reason?: string | null; env?: string | null };
+
+/** Read the recovery log for the current namespace, newest first. */
+export async function fetchRecovery(): Promise<RecoveryEntry[]> {
+  if (MODE !== "cloud" || !supabase) return [];
+  const { data } = await supabase.from("recovery").select("*").order("deleted_at", { ascending: false });
+  return ((data as RecoveryRow[] | null) ?? [])
+    .filter((r) => (r.env ?? "live") === ENV)
+    .map((r) => ({ id: r.id, kind: r.kind, refId: r.ref_id, payload: r.payload, deletedAt: r.deleted_at, reason: r.reason ?? "" }));
+}
+
+/** Permanently drop one recovery entry (after restore, or an explicit purge). */
+export async function purgeRecovery(id: string): Promise<void> {
+  if (MODE !== "cloud" || !supabase) return;
+  await supabase.from("recovery").delete().eq("id", id);
+}
+
+/** Restore a recovery entry back to its live table, then drop it from recovery. */
+export async function restoreRecovery(entry: RecoveryEntry): Promise<boolean> {
+  if (MODE !== "cloud" || !supabase) return false;
+  if (entry.kind === "order") {
+    const o = entry.payload as Order;
+    const { error } = await supabase.from("orders").upsert(orderToRow(o));
+    if (error) return false;
+    if (!state.orders.some((x) => x.id === o.id)) {
+      const tacosSold = state.tacosSold + tacoCountOf(o.items, state.menu);
+      setState({ ...state, orders: [...state.orders, o], tacosSold });
+      push(supabase.from("app_state").update({ tacos_sold: tacosSold }).eq("id", APP_STATE_ID));
+    }
+  } else if (entry.kind === "archive") {
+    const a = entry.payload as Archive;
+    const { error } = await supabase.from("archives").upsert({ id: a.id, closed_at: a.closedAt, orders: a.orders, tabs: a.tabs ?? [], env: ENV });
+    if (error) return false;
+    if (!state.archives.some((x) => x.id === a.id)) {
+      setState({ ...state, archives: [a, ...state.archives].sort((x, y) => y.closedAt - x.closedAt) });
+    }
+  } else {
+    // menu_item — add back into the menu jsonb if it isn't already there.
+    const item = entry.payload as Taco;
+    if (!state.menu.some((m) => m.id === item.id)) {
+      const menu = normalizeMenu([...state.menu, item]);
+      setState({ ...state, menu });
+      const { error } = await supabase.from("app_state").update({ menu }).eq("id", APP_STATE_ID);
+      if (error) return false;
+    }
+  }
+  await purgeRecovery(entry.id);
+  return true;
+}
+
 export function fireOrder(items: Record<string, number>, note: string, name = "", payment?: PaymentMethod, tabId?: string) {
   const cleaned: Record<string, number> = {};
   for (const [id, qty] of Object.entries(items)) if (qty > 0) cleaned[id] = qty;
@@ -826,7 +925,7 @@ export function bumpOrder(id: string) {
  * counts are derived from the orders list, removing the order automatically
  * backs its total out of the day's sales. Password-gated in the UI.
  */
-export function deleteOrder(id: string) {
+export async function deleteOrder(id: string) {
   const order = state.orders.find((o) => o.id === id);
   // Cancelling backs the order's tacos out of the cumulative counter (floored at 0).
   const tacosSold = order
@@ -834,6 +933,9 @@ export function deleteOrder(id: string) {
     : state.tacosSold;
   setState({ ...state, orders: state.orders.filter((o) => o.id !== id), tacosSold });
   if (MODE === "cloud" && supabase) {
+    // Save to recovery FIRST — only delete the real row once it's safely stored.
+    // If the recovery save fails, skip the delete; the next hydrate re-adds it.
+    if (order && !(await recordTrash("order", id, order, "order deleted"))) return;
     push(supabase.from("orders").delete().eq("id", id));
     if (order) push(supabase.from("app_state").update({ tacos_sold: tacosSold }).eq("id", APP_STATE_ID));
   }
@@ -913,19 +1015,36 @@ export function addMenuItem(name: string, isTaco: boolean) {
 }
 
 /** Remove a menu item (e.g. one added by mistake). */
-export function removeMenuItem(id: string) {
-  const menu = state.menu.filter((t) => t.id !== id);
+export async function removeMenuItem(id: string) {
+  const prevMenu = state.menu;
+  const item = prevMenu.find((t) => t.id === id);
+  const menu = prevMenu.filter((t) => t.id !== id);
   setState({ ...state, menu });
   if (MODE === "cloud" && supabase) {
+    // Save the item to recovery before dropping it from the menu jsonb.
+    if (item && !(await recordTrash("menu_item", id, item, "menu item removed"))) {
+      setState({ ...state, menu: prevMenu }); // recovery failed — keep the item
+      return;
+    }
     push(supabase.from("app_state").update({ menu }).eq("id", APP_STATE_ID));
   }
 }
 
-export function resetService() {
+export async function resetService() {
   // Capture current ids first so we delete exactly this namespace's rows
   // (by id — avoids depending on the env column existing).
   const orderIds = state.orders.map((o) => o.id);
   const archiveIds = state.archives.map((a) => a.id);
+  // Snapshot EVERYTHING this wipes (orders, archives, and the custom menu) into
+  // the recovery log before touching it. Abort the whole reset if that fails.
+  if (MODE === "cloud" && supabase) {
+    const rows = [
+      ...state.orders.map((o) => ({ kind: "order" as const, refId: o.id, payload: o, reason: "service reset" })),
+      ...state.archives.map((a) => ({ kind: "archive" as const, refId: a.id, payload: a, reason: "service reset" })),
+      ...state.menu.map((m) => ({ kind: "menu_item" as const, refId: m.id, payload: m, reason: "service reset" })),
+    ];
+    if (!(await recordTrashMany(rows))) return;
+  }
   const fresh: State = MODE === "cloud"
     ? { menu: DEFAULT_MENU, orders: [], nextNumber: 1, archives: [], tabs: [], ...STOREFRONT_DEFAULTS }
     : defaultState();
@@ -995,10 +1114,12 @@ export async function closeOutDay(): Promise<boolean> {
   return true;
 }
 
-/** Permanently remove one archived service (e.g. to clear a test run). */
-export function deleteArchive(id: string) {
+/** Remove one archived service from the board — recoverable from the recovery log. */
+export async function deleteArchive(id: string) {
+  const archive = state.archives.find((a) => a.id === id);
   setState({ ...state, archives: state.archives.filter((a) => a.id !== id) });
   if (MODE === "cloud" && supabase) {
+    if (archive && !(await recordTrash("archive", id, archive, "archived service deleted"))) return;
     push(supabase.from("archives").delete().eq("id", id));
   }
 }

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { useStore, updateTaco, resetService, setOpen, setLocation, setSchedule, setSpecialEvent, addMenuItem, removeMenuItem, isDemo, useDemoControl, setDemoEnabled, bootDemo, startBoardPresence, stopBoardPresence, fetchVisitsTotal } from "../lib/store";
 import { useI18n } from "../lib/i18n";
 import { ChilliPicker } from "../components/Chilli";
@@ -321,7 +322,13 @@ export default function Menu() {
         </div>
       )}
 
-      <div className="mt-auto px-5 pb-8 pt-6">
+      <div className="mt-auto space-y-3 px-5 pb-8 pt-6">
+        <Link
+          to="/app/recovery"
+          className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-teal-soft py-3 text-sm font-black uppercase tracking-wide text-teal-deep transition active:scale-[0.98]"
+        >
+          {t("recovery.title")}
+        </Link>
         <button
           onClick={() => {
             if (confirm(t("menu.reset_confirm"))) resetService();

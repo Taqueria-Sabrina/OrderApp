@@ -9,6 +9,7 @@ import Queue from "./pages/Queue";
 import Dashboard from "./pages/Dashboard";
 import Menu from "./pages/Menu";
 import History from "./pages/History";
+import Recovery from "./pages/Recovery";
 
 export default function App() {
   // Vite injects BASE_URL ("/OrderApp/" in the Pages build, "/" in dev). Strip
@@ -35,6 +36,7 @@ export default function App() {
           <Route path="/app/dashboard" element={<Dashboard />} />
           <Route path="/app/history" element={<History />} />
           <Route path="/app/menu" element={<Menu />} />
+          <Route path="/app/recovery" element={<Recovery />} />
         </Route>
       </Routes>
     </BrowserRouter>

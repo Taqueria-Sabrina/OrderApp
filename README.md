@@ -59,6 +59,19 @@ alter table archives add column if not exists env  text not null default 'live';
 -- fails to save the archive.
 alter table archives add column if not exists tabs jsonb not null default '[]';
 
+-- Recovery: append-only soft-delete log. Every deleted order / menu item /
+-- archived service is copied here BEFORE its real row is removed, so the
+-- back-office Recovery screen can restore it. Nothing is ever truly lost.
+create table if not exists recovery (
+  id         uuid   primary key default gen_random_uuid(),
+  kind       text   not null,          -- 'order' | 'menu_item' | 'archive'
+  ref_id     text   not null,          -- original id of the deleted thing
+  payload    jsonb  not null,          -- full snapshot used to restore it
+  env        text   not null default 'live',
+  deleted_at bigint not null,
+  reason     text   not null default ''
+);
+
 -- Visits: one row per unique device that opens the public homepage (simple
 -- analytics; total shown in the Leo backend Settings panel).
 create table if not exists visits (
@@ -107,11 +120,13 @@ alter table orders    enable row level security;
 alter table archives  enable row level security;
 alter table app_state enable row level security;
 alter table visits    enable row level security;
+alter table recovery  enable row level security;
 
 create policy "anon all orders"    on orders    for all using (true) with check (true);
 create policy "anon all archives"  on archives  for all using (true) with check (true);
 create policy "anon all app_state" on app_state for all using (true) with check (true);
 create policy "anon all visits"    on visits    for all using (true) with check (true);
+create policy "anon all recovery"  on recovery  for all using (true) with check (true);
 
 -- Turn on realtime for all three tables
 alter publication supabase_realtime add table orders;
