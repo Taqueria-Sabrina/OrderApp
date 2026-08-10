@@ -136,7 +136,8 @@ function Settings() {
 
 export default function Menu() {
   const state = useStore();
-  const { t } = useI18n();
+  const { t, money } = useI18n();
+  const [showRetired, setShowRetired] = useState(false);
 
   return (
     <div className="flex min-h-full flex-col">
@@ -235,7 +236,7 @@ export default function Menu() {
       </div>
 
       <div className="space-y-3 px-5">
-        {state.menu.map((taco) => (
+        {state.menu.filter((t) => !t.retired).map((taco) => (
           <div
             key={taco.id}
             className="rounded-2xl border-2 bg-paper p-4 shadow-sm transition"
@@ -299,16 +300,69 @@ export default function Menu() {
                   {taco.isTaco ? `${t("menu.taco")} · ${t("menu.taco_hint")}` : t("menu.taco")}
                 </span>
               </div>
-              <button
-                onClick={() => removeMenuItem(taco.id)}
-                className="text-[11px] font-extrabold uppercase tracking-wide text-pink-deep underline underline-offset-4"
-              >
-                {t("menu.remove")}
-              </button>
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => updateTaco(taco.id, { retired: true, active: false, soldOut: false })}
+                  className="text-[11px] font-extrabold uppercase tracking-wide text-ink-soft underline underline-offset-4"
+                >
+                  {t("menu.retire")}
+                </button>
+                <button
+                  onClick={() => removeMenuItem(taco.id)}
+                  className="text-[11px] font-extrabold uppercase tracking-wide text-pink-deep underline underline-offset-4"
+                >
+                  {t("menu.remove")}
+                </button>
+              </div>
             </div>
           </div>
         ))}
       </div>
+
+      {/* Retired tacos — kept for the record, hidden from rotation. Collapsible
+          so the backend stays tidy; restore any one with a tap. */}
+      {state.menu.some((t) => t.retired) && (
+        <div className="mt-4 px-5">
+          <button
+            onClick={() => setShowRetired((v) => !v)}
+            className="flex w-full items-center justify-between rounded-2xl border-2 border-line bg-paper px-4 py-3 text-left"
+          >
+            <span className="text-sm font-black uppercase tracking-wide text-ink-soft">
+              {t("menu.retired_title")} · {state.menu.filter((t) => t.retired).length}
+            </span>
+            <span className="text-xs font-extrabold uppercase tracking-wide text-teal-deep">
+              {showRetired ? t("dash.hide") : t("dash.view")}
+            </span>
+          </button>
+          {showRetired && (
+            <div className="mt-2 space-y-2">
+              {state.menu.filter((t) => t.retired).map((taco) => (
+                <div key={taco.id} className="flex items-center justify-between gap-3 rounded-xl border border-line bg-paper px-4 py-3">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: taco.tint }} />
+                    <span className="truncate font-display text-base font-black text-ink">{taco.name}</span>
+                    <span className="shrink-0 text-xs font-bold text-ink-soft">{money(taco.price)}</span>
+                  </span>
+                  <div className="flex shrink-0 items-center gap-4">
+                    <button
+                      onClick={() => updateTaco(taco.id, { retired: false })}
+                      className="text-[11px] font-extrabold uppercase tracking-wide text-teal-deep underline underline-offset-4"
+                    >
+                      {t("menu.restore")}
+                    </button>
+                    <button
+                      onClick={() => removeMenuItem(taco.id)}
+                      className="text-[11px] font-extrabold uppercase tracking-wide text-pink-deep underline underline-offset-4"
+                    >
+                      {t("menu.remove")}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Add a new item */}
       <div className="mt-4 px-5">

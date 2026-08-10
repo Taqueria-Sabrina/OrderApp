@@ -248,8 +248,8 @@ export default function Order() {
   const state = useStore();
   const { t, money } = useI18n();
   const navigate = useNavigate();
-  // Orderable = on the menu and not sold out.
-  const menu = state.menu.filter((taco) => taco.active && !taco.soldOut);
+  // Orderable = on the menu, not sold out, not retired.
+  const menu = state.menu.filter((taco) => taco.active && !taco.soldOut && !taco.retired);
 
   const [qty, setQty] = useState<Record<string, number>>({});
   const [name, setName] = useState("");

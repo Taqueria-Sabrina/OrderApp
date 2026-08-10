@@ -51,6 +51,7 @@ create table if not exists archives (
   closed_at bigint not null,
   orders    jsonb  not null default '[]',
   tabs      jsonb  not null default '[]',
+  menu      jsonb,
   env       text not null default 'live'
 );
 alter table archives add column if not exists env  text not null default 'live';
@@ -58,6 +59,10 @@ alter table archives add column if not exists env  text not null default 'live';
 -- grouped (tab) pricing stays correct. REQUIRED: without it, closing the day
 -- fails to save the archive.
 alter table archives add column if not exists tabs jsonb not null default '[]';
+-- menu snapshots the item names/prices AS THEY WERE that day, so a past
+-- service's report never changes when items are later renamed or retired.
+-- REQUIRED: without it, closing the day fails to save the archive.
+alter table archives add column if not exists menu jsonb;
 
 -- Recovery: append-only soft-delete log. Every deleted order / menu item /
 -- archived service is copied here BEFORE its real row is removed, so the

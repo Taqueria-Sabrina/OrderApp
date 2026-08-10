@@ -22,7 +22,12 @@ function ArchiveRow({ archive }: { archive: Archive }) {
   const [open, setOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const sold = soldCountsOf(archive.orders);
-  const rev = revenueOf(archive.orders, state.menu, archive.tabs ?? []);
+  // Price + name this service from the menu AS IT WAS that day (snapshot). Older
+  // archives predate the snapshot, so fall back to the current menu / then the id.
+  const snapMenu = archive.menu ?? state.menu;
+  const byId = Object.fromEntries(snapMenu.map((t) => [t.id, t]));
+  const stateById = Object.fromEntries(state.menu.map((t) => [t.id, t]));
+  const rev = revenueOf(archive.orders, snapMenu, archive.tabs ?? []);
   const totalSold = Object.values(sold).reduce((a, b) => a + b, 0);
 
   return (
@@ -44,19 +49,21 @@ function ArchiveRow({ archive }: { archive: Archive }) {
 
       {open && (
         <div className="mt-3 space-y-1.5 border-t border-line pt-3">
-          {state.menu.map((taco) => {
-            const n = sold[taco.id] ?? 0;
-            if (n === 0) return null;
-            return (
-              <div key={taco.id} className="flex items-center justify-between text-sm font-bold text-ink">
-                <span className="flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: taco.tint }} />
-                  {taco.name}
-                </span>
-                <span className="tabular-nums text-ink-soft">{n} ×</span>
-              </div>
-            );
-          })}
+          {Object.entries(sold)
+            .sort((a, b) => b[1] - a[1])
+            .map(([id, n]) => {
+              if (n === 0) return null;
+              const taco = byId[id] ?? stateById[id];
+              return (
+                <div key={id} className="flex items-center justify-between text-sm font-bold text-ink">
+                  <span className="flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: taco?.tint ?? "#c9c1d6" }} />
+                    {taco?.name ?? id}
+                  </span>
+                  <span className="tabular-nums text-ink-soft">{n} ×</span>
+                </div>
+              );
+            })}
           {Object.keys(sold).length === 0 && (
             <p className="text-sm font-semibold text-ink-soft">—</p>
           )}
@@ -94,7 +101,9 @@ export default function Dashboard() {
   const orders = state.orders.length;
   const rev = revenue(state);
   const pay = revenueByPayment(state);
-  const max = Math.max(1, ...state.menu.map((taco) => sold[taco.id] ?? 0));
+  // Live chart lists the current roster only — retired items live in past reports.
+  const liveMenu = state.menu.filter((taco) => !taco.retired);
+  const max = Math.max(1, ...liveMenu.map((taco) => sold[taco.id] ?? 0));
   const openTabs = state.tabs.filter((tb) => tb.status === "open").length;
   const tabsBlock = hasOpenTabs(state);
 
@@ -175,7 +184,7 @@ export default function Dashboard() {
       <div className="rounded-3xl border border-line bg-paper p-5 shadow-sm">
         <h2 className="mb-4 font-display text-xl font-black text-ink">{t("dash.sold_by")}</h2>
         <div className="space-y-4">
-          {state.menu.map((taco) => {
+          {liveMenu.map((taco) => {
             const n = sold[taco.id] ?? 0;
             return (
               <div key={taco.id}>

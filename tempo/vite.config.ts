@@ -7,6 +7,7 @@ import { defineConfig } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 
 const tempoRoot = path.dirname(fileURLToPath(import.meta.url));
+const projectRoot = path.resolve(tempoRoot, "..");
 
 export default defineConfig({
   root: tempoRoot,
@@ -15,7 +16,7 @@ export default defineConfig({
   },
   plugins: [
     tailwindcss(),
-    tempoVitePlugin(),
+    tempoVitePlugin({ sourceIdentityRoot: projectRoot }),
     react(),
     tsconfigPaths({
       projectDiscovery: "lazy",

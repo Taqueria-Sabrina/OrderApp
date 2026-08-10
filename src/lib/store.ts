@@ -55,6 +55,9 @@ export type Taco = {
   isTaco: boolean; // in the taco bundle deal? (false = a la carte)
   active: boolean; // ON THE MENU — false hides it from the public board entirely
   soldOut: boolean; // shown but grayed "sold out"; independent of `active`
+  retired?: boolean; // taken out of rotation entirely — kept for records + restore,
+  // hidden from the active editor/board/order screen. A retired item's id is
+  // never reused, so historical reports stay unambiguous.
 };
 
 // "done" is a terminal, archived state: the ticket has left the live queue
@@ -105,6 +108,8 @@ export type Archive = {
   closedAt: number; // when the day was closed out
   orders: Order[]; // the orders that were live when closed
   tabs?: Tab[]; // the tabs at close-out (for correct grouped pricing later)
+  menu?: Taco[]; // the menu AS IT WAS that day, so this service's report always
+  // shows the right names/prices even after items are later renamed or retired
 };
 
 export type State = {
@@ -392,7 +397,7 @@ type OrderRow = {
   env?: string;
 };
 
-type ArchiveRow = { id: string; closed_at: number; orders: Order[]; tabs?: Tab[] | null };
+type ArchiveRow = { id: string; closed_at: number; orders: Order[]; tabs?: Tab[] | null; menu?: Taco[] | null };
 
 function orderToRow(o: Order): OrderRow {
   return {
@@ -443,7 +448,7 @@ async function hydrateFromCloud() {
 
   const archives = ((archivesRes.data as (ArchiveRow & { env?: string | null })[] | null) ?? [])
     .filter(inEnv)
-    .map((r) => ({ id: r.id, closedAt: r.closed_at, orders: r.orders, tabs: r.tabs ?? [] }));
+    .map((r) => ({ id: r.id, closedAt: r.closed_at, orders: r.orders, tabs: r.tabs ?? [], menu: r.menu ?? undefined }));
   archives.sort((a, b) => b.closedAt - a.closedAt);
 
   const app = appRes.data as
@@ -817,7 +822,7 @@ export async function restoreRecovery(entry: RecoveryEntry): Promise<boolean> {
     }
   } else if (entry.kind === "archive") {
     const a = entry.payload as Archive;
-    const { error } = await supabase.from("archives").upsert({ id: a.id, closed_at: a.closedAt, orders: a.orders, tabs: a.tabs ?? [], env: ENV });
+    const { error } = await supabase.from("archives").upsert({ id: a.id, closed_at: a.closedAt, orders: a.orders, tabs: a.tabs ?? [], menu: a.menu ?? null, env: ENV });
     if (error) return false;
     if (!state.archives.some((x) => x.id === a.id)) {
       setState({ ...state, archives: [a, ...state.archives].sort((x, y) => y.closedAt - x.closedAt) });
@@ -1086,7 +1091,9 @@ export function hasOpenTabs(state: State): boolean {
 export async function closeOutDay(): Promise<boolean> {
   if (hasOpenTabs(state)) return false; // must settle every tab first
   if (state.orders.length === 0) return false;
-  const archive: Archive = { id: uid(), closedAt: Date.now(), orders: state.orders, tabs: state.tabs };
+  // Snapshot the menu as it is right now so this service's report is frozen —
+  // later renames/retires can't rewrite what these tacos were called today.
+  const archive: Archive = { id: uid(), closedAt: Date.now(), orders: state.orders, tabs: state.tabs, menu: state.menu };
   const clear = () =>
     setState({ ...state, orders: [], nextNumber: 1, tabs: [], archives: [archive, ...state.archives] });
 
@@ -1096,7 +1103,7 @@ export async function closeOutDay(): Promise<boolean> {
     // with the board untouched — a failed archive must never destroy the orders.
     const { error } = await supabase
       .from("archives")
-      .insert({ id: archive.id, closed_at: archive.closedAt, orders: archive.orders, tabs: archive.tabs, env: ENV });
+      .insert({ id: archive.id, closed_at: archive.closedAt, orders: archive.orders, tabs: archive.tabs, menu: archive.menu, env: ENV });
     if (error) {
       console.error("[store] close-out ABORTED — archive save failed, orders preserved:", error);
       return false;

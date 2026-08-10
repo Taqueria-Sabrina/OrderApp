@@ -66,7 +66,7 @@ export default function MenuBoard() {
   const today = longDate(new Date());
   // Only items that are ON THE MENU (active) appear at all. "Sold out" is a
   // separate flag handled per-card (grayed) and does NOT remove the item.
-  const onMenu = state.menu.filter((m) => m.active);
+  const onMenu = state.menu.filter((m) => m.active && !m.retired);
   const anyActive = onMenu.length > 0;
   const tacos = onMenu.filter((m) => m.isTaco);
   const others = onMenu.filter((m) => !m.isTaco);

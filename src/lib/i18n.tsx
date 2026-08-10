@@ -219,6 +219,9 @@ const ES: Dict = {
   "menu.sub": "Renombra, cambia precio o 86 un taco. Se sincroniza a cada teléfono.",
   "menu.on_menu": "En el menú",
   "menu.hidden": "Oculto · 86'd",
+  "menu.retire": "Retirar",
+  "menu.restore": "Restaurar",
+  "menu.retired_title": "Tacos retirados",
   "menu.reset": "Reiniciar servicio (borrar pedidos)",
   "menu.reset_confirm": "¿Reiniciar el servicio? Borra todos los pedidos y restaura el menú por defecto.",
 };
@@ -422,6 +425,9 @@ const EN: Dict = {
   "menu.sub": "Rename, reprice, or 86 a taco. Changes sync to every phone.",
   "menu.on_menu": "On menu",
   "menu.hidden": "Hidden · 86'd",
+  "menu.retire": "Retire",
+  "menu.restore": "Restore",
+  "menu.retired_title": "Retired tacos",
   "menu.reset": "Reset service (clear orders)",
   "menu.reset_confirm": "Reset the service? Clears all orders and restores the default menu.",
 };
