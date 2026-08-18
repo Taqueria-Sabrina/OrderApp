@@ -19,7 +19,8 @@ function ItemCard({ item, money, soldOut }: { item: Taco; money: (n: number) => 
           <h2 className="font-display text-2xl font-black leading-tight text-ink">{item.name}</h2>
           <Chillis level={item.heat} size={18} />
         </div>
-        {item.note && <p className="mt-0.5 text-[13px] leading-snug text-ink-soft">{item.note}</p>}
+        {item.note && <p className="mt-1 text-[15px] font-semibold leading-snug text-ink">{item.note}</p>}
+        {item.note2 && <p className="mt-1 text-[13px] leading-snug text-ink-soft">{item.note2}</p>}
       </div>
       {item.soldOut ? (
         <span className="rounded-full bg-cream px-3 py-1 text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">

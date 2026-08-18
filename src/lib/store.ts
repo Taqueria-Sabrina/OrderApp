@@ -48,7 +48,8 @@ const APP_STATE_ID = isDemo ? 2 : 1;
 export type Taco = {
   id: string;
   name: string;
-  note: string;
+  note: string; // primary description (main ingredient line) — shown bolder/larger
+  note2?: string; // secondary line (e.g. "served with…") — smaller, softer
   price: number;
   tint: string; // brand color that stands in for the item visually
   heat: number; // chilli rating 0–3, shown on the public board

@@ -262,7 +262,14 @@ export default function Menu() {
                   <input
                     value={taco.note}
                     onChange={(e) => updateTaco(taco.id, { note: e.target.value })}
-                    className="mt-0.5 w-full bg-transparent text-[13px] text-ink-soft outline-none"
+                    placeholder={t("menu.note_ph")}
+                    className="mt-1.5 w-full bg-transparent text-[15px] font-semibold text-ink outline-none placeholder:font-normal placeholder:text-ink-soft"
+                  />
+                  <input
+                    value={taco.note2 ?? ""}
+                    onChange={(e) => updateTaco(taco.id, { note2: e.target.value })}
+                    placeholder={t("menu.note2_ph")}
+                    className="mt-1.5 w-full bg-transparent text-[13px] text-ink-soft outline-none placeholder:text-ink-soft"
                   />
                 </div>
               </div>
