@@ -23,6 +23,11 @@ function Row({ order }: { order: Order }) {
         <div className="flex items-center gap-3">
           <span className="font-display text-xl font-black text-ink">#{order.number}</span>
           <span className="text-sm font-bold text-ink">{order.name || t("order.noname")}</span>
+          {order.table && (
+            <span className="rounded-md bg-cream px-2 py-0.5 text-xs font-extrabold uppercase tracking-wide text-ink-soft">
+              {t("order.table_short")}{order.table}
+            </span>
+          )}
         </div>
         <div className="text-right">
           <span className="font-display text-lg font-black text-pink-deep">{money(orderTotal(order, state.menu))}</span>

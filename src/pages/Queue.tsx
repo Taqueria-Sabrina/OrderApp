@@ -25,6 +25,11 @@ function Card({ order, accent, now }: { order: Order; accent: string; now: numbe
         <span className="flex items-baseline gap-2">
           <span className="font-display text-xl font-black text-ink">#{order.number}</span>
           {order.name && <span className="text-sm font-bold text-pink-deep">{order.name}</span>}
+          {order.table && (
+            <span className="rounded-md bg-teal-soft px-2 py-0.5 text-xs font-extrabold uppercase tracking-wide text-teal-deep">
+              {t("order.table_short")}{order.table}
+            </span>
+          )}
         </span>
         <span className="text-xs font-semibold text-ink-soft">{timeLabel}</span>
       </div>

@@ -93,6 +93,8 @@ const ES: Dict = {
   "login.demo_hint": "Demo: admin / admin",
 
   "order.name_ph": "Nombre del cliente (opcional)",
+  "order.table_ph": "Mesa",
+  "order.table_short": "Mesa ",
   "order.noname": "Sin nombre",
 
   "hist.kicker": "Trastienda",
@@ -299,6 +301,8 @@ const EN: Dict = {
   "login.demo_hint": "Demo: admin / admin",
 
   "order.name_ph": "Customer name (optional)",
+  "order.table_ph": "Table",
+  "order.table_short": "Table ",
   "order.noname": "No name",
 
   "hist.kicker": "Back of House",

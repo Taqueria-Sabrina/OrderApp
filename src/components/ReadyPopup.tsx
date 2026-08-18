@@ -38,6 +38,11 @@ export default function ReadyPopup({ orders, onClose }: { orders: Order[]; onClo
                 <div className="mb-1 flex items-baseline gap-2">
                   <span className="font-display text-xl font-black text-ink">#{o.number}</span>
                   {o.name && <span className="text-sm font-bold text-pink-deep">{o.name}</span>}
+                  {o.table && (
+                    <span className="rounded-md bg-teal-soft px-2 py-0.5 text-xs font-extrabold uppercase tracking-wide text-teal-deep">
+                      {t("order.table_short")}{o.table}
+                    </span>
+                  )}
                 </div>
                 <div className="mb-3 flex flex-wrap gap-x-3 text-sm font-bold text-ink">
                   {Object.entries(o.items).map(([id, q]) => (

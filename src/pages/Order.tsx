@@ -206,7 +206,10 @@ function TabsPopup({ onClose }: { onClose: () => void }) {
               return (
                 <div key={tb.id} className="rounded-2xl border border-line border-l-4 border-l-amber bg-paper p-4 shadow-sm">
                   <div className="mb-1 flex items-center justify-between">
-                    <span className="font-display text-lg font-black text-ink">{tb.name}</span>
+                    <span className="font-display text-lg font-black text-ink">
+                      {tb.name}
+                      {tb.table && <span className="ml-2 rounded-md bg-cream px-2 py-0.5 text-xs font-extrabold text-ink-soft">{t("order.table_short")}{tb.table}</span>}
+                    </span>
                     <span className="font-display text-xl font-black text-pink-deep">{money(tabTotalOf(ords, state.menu))}</span>
                   </div>
                   <div className="mb-3 flex flex-wrap gap-x-3 text-sm font-bold text-ink">
@@ -253,6 +256,7 @@ export default function Order() {
 
   const [qty, setQty] = useState<Record<string, number>>({});
   const [name, setName] = useState("");
+  const [table, setTable] = useState("");
   const [note, setNote] = useState("");
   const [tabId, setTabId] = useState(""); // selected existing tab ("" = none/new)
   const [flash, setFlash] = useState(false);
@@ -272,6 +276,7 @@ export default function Order() {
     setCheckout(false);
     setQty({});
     setName("");
+    setTable("");
     setNote("");
     setTabId("");
     setFlash(true);
@@ -283,14 +288,14 @@ export default function Order() {
 
   // Fire a standalone order paid now / comp.
   const fire = (payment: PaymentMethod) => {
-    fireOrder(qty, note, name, payment);
+    fireOrder(qty, note, name, payment, undefined, table);
     reset();
   };
   // Send to kitchen; either onto a chosen tab, a brand-new tab, or checkout.
   const send = () => {
     if (tabId) {
       const tab = openTabs.find((tb) => tb.id === tabId);
-      fireOrder(qty, note, tab?.name ?? name, "later", tabId);
+      fireOrder(qty, note, tab?.name ?? name, "later", tabId, tab?.table ?? table);
       reset();
       return;
     }
@@ -298,8 +303,8 @@ export default function Order() {
   };
   const onPaid = (m: PaymentMethod) => {
     if (m === "later") {
-      const id = createTab(name);
-      fireOrder(qty, note, name, "later", id);
+      const id = createTab(name, table);
+      fireOrder(qty, note, name, "later", id, table);
       reset();
       return;
     }
@@ -371,23 +376,40 @@ export default function Order() {
       </div>
 
       <div className="space-y-3 px-5 pb-4">
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder={t("order.name_ph")}
-          disabled={tabId !== ""}
-          className="w-full rounded-xl border-2 border-line bg-paper px-4 py-3 text-sm font-semibold text-ink placeholder:text-ink-soft focus:border-teal focus:outline-none disabled:opacity-50"
-        />
-        {/* Tab picker appears only once at least one tab is open for the day */}
+        <div className="flex gap-2">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={t("order.name_ph")}
+            disabled={tabId !== ""}
+            className="min-w-0 flex-1 rounded-xl border-2 border-line bg-paper px-4 py-3 text-sm font-semibold text-ink placeholder:text-ink-soft focus:border-teal focus:outline-none disabled:opacity-50"
+          />
+          <input
+            value={table}
+            onChange={(e) => setTable(e.target.value)}
+            placeholder={t("order.table_ph")}
+            disabled={tabId !== ""}
+            inputMode="numeric"
+            className="w-24 shrink-0 rounded-xl border-2 border-line bg-paper px-3 py-3 text-center text-sm font-semibold text-ink placeholder:text-ink-soft focus:border-teal focus:outline-none disabled:opacity-50"
+          />
+        </div>
+        {/* Tab picker appears only once at least one tab is open for the day.
+            Choosing a tab pulls in its table number for the joined order. */}
         {openTabs.length > 0 && (
           <select
             value={tabId}
-            onChange={(e) => setTabId(e.target.value)}
+            onChange={(e) => {
+              setTabId(e.target.value);
+              const tb = openTabs.find((x) => x.id === e.target.value);
+              setTable(tb?.table ?? "");
+            }}
             className="w-full rounded-xl border-2 border-line bg-cream px-3 py-3 text-sm font-semibold text-ink focus:border-teal focus:outline-none"
           >
             <option value="">{t("order.tab_none")}</option>
             {openTabs.map((tb) => (
-              <option key={tb.id} value={tb.id}>{t("order.tab_prefix")} {tb.name}</option>
+              <option key={tb.id} value={tb.id}>
+                {t("order.tab_prefix")} {tb.name}{tb.table ? ` · ${t("order.table_short")}${tb.table}` : ""}
+              </option>
             ))}
           </select>
         )}

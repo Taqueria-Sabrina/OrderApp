@@ -78,6 +78,7 @@ export type Order = {
   completedAt?: number; // set when the ticket is picked up / archived
   payment?: PaymentMethod; // how it was paid (set at checkout)
   tabId?: string; // if part of a "pay later" tab
+  table?: string; // table number / label the order is for ("" if none)
 };
 
 /** A running "pay later" tab — one ticket that accumulates several orders; the
@@ -88,6 +89,7 @@ export type Tab = {
   createdAt: number;
   status: "open" | "closed";
   payment?: "cash" | "card" | "comp"; // how it was settled (once closed)
+  table?: string; // table number / label this tab is running at ("" if none)
 };
 
 /** A soft-deleted thing kept in the `recovery` table so it can be restored.
@@ -394,6 +396,7 @@ type OrderRow = {
   completed_at: number | null;
   payment?: PaymentMethod | null;
   tab_id?: string | null;
+  table_num?: string | null;
   env?: string;
 };
 
@@ -411,6 +414,7 @@ function orderToRow(o: Order): OrderRow {
     completed_at: o.completedAt ?? null,
     payment: o.payment ?? null,
     tab_id: o.tabId ?? null,
+    table_num: o.table ?? null,
     env: ENV, // namespace tag so demo rows never mix with live
   };
 }
@@ -427,6 +431,7 @@ function rowToOrder(r: OrderRow): Order {
     completedAt: r.completed_at ?? undefined,
     payment: r.payment ?? undefined,
     tabId: r.tab_id ?? undefined,
+    table: r.table_num ?? undefined,
   };
 }
 
@@ -841,7 +846,7 @@ export async function restoreRecovery(entry: RecoveryEntry): Promise<boolean> {
   return true;
 }
 
-export function fireOrder(items: Record<string, number>, note: string, name = "", payment?: PaymentMethod, tabId?: string) {
+export function fireOrder(items: Record<string, number>, note: string, name = "", payment?: PaymentMethod, tabId?: string, table = "") {
   const cleaned: Record<string, number> = {};
   for (const [id, qty] of Object.entries(items)) if (qty > 0) cleaned[id] = qty;
   if (Object.keys(cleaned).length === 0) return;
@@ -855,6 +860,7 @@ export function fireOrder(items: Record<string, number>, note: string, name = ""
     createdAt: Date.now(),
     payment,
     tabId,
+    table: table.trim() || undefined,
   };
   const nextNumber = state.nextNumber + 1;
   // Bump the cumulative tacos-sold counter (public board) by this order's tacos.
@@ -868,8 +874,8 @@ export function fireOrder(items: Record<string, number>, note: string, name = ""
 }
 
 /** Open a new pay-later tab (named by the customer) and return its id. */
-export function createTab(name: string): string {
-  const tab: Tab = { id: `tab-${uid()}`, name: name.trim() || "Cuenta", createdAt: Date.now(), status: "open" };
+export function createTab(name: string, table = ""): string {
+  const tab: Tab = { id: `tab-${uid()}`, name: name.trim() || "Cuenta", createdAt: Date.now(), status: "open", table: table.trim() || undefined };
   const tabs = [...state.tabs, tab];
   setState({ ...state, tabs });
   if (MODE === "cloud" && supabase) {

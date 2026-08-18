@@ -36,6 +36,8 @@ create table if not exists orders (
   created_at   bigint not null,
   completed_at bigint,
   payment      text,
+  tab_id       text,
+  table_num    text,
   env          text not null default 'live'
 );
 -- If orders already exists from an earlier setup, add the columns:
@@ -44,6 +46,8 @@ alter table orders add column if not exists payment text;
 -- tab_id groups the orders that belong to one running "pay later" tab so they
 -- bill as a single ticket (bundle pricing recomputed across all of them).
 alter table orders add column if not exists tab_id  text;
+-- table_num is the table number/label an order (and its tab) is for.
+alter table orders add column if not exists table_num text;
 
 -- Archives: one row per closed-out service (a JSON snapshot of its orders)
 create table if not exists archives (
