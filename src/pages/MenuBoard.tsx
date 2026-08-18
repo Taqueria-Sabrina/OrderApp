@@ -16,7 +16,7 @@ function ItemCard({ item, money, soldOut }: { item: Taco; money: (n: number) => 
       <span className="h-12 w-2 shrink-0 rounded-full" style={{ backgroundColor: item.tint }} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <h2 className="font-display text-2xl font-black leading-tight text-ink">{item.name}</h2>
+          <h2 className="font-display text-2xl font-black leading-tight" style={{ color: item.nameColor ?? "#33264a" }}>{item.name}</h2>
           <Chillis level={item.heat} size={18} />
         </div>
         {item.note && <p className="mt-1 text-[15px] font-semibold leading-snug text-ink">{item.note}</p>}

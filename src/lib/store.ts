@@ -51,7 +51,8 @@ export type Taco = {
   note: string; // primary description (main ingredient line) — shown bolder/larger
   note2?: string; // secondary line (e.g. "served with…") — smaller, softer
   price: number;
-  tint: string; // brand color that stands in for the item visually
+  tint: string; // brand color that stands in for the item visually (box/accents)
+  nameColor?: string; // color of the item NAME on the public board (defaults to ink)
   heat: number; // chilli rating 0–3, shown on the public board
   isTaco: boolean; // in the taco bundle deal? (false = a la carte)
   active: boolean; // ON THE MENU — false hides it from the public board entirely

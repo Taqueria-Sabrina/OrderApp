@@ -254,11 +254,23 @@ export default function Menu() {
                   style={{ backgroundColor: taco.tint }}
                 />
                 <div className="min-w-0 flex-1">
-                  <input
-                    value={taco.name}
-                    onChange={(e) => updateTaco(taco.id, { name: e.target.value })}
-                    className="w-full bg-transparent font-display text-lg font-black text-ink outline-none"
-                  />
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={taco.nameColor ?? "#33264a"}
+                      onChange={(e) => updateTaco(taco.id, { nameColor: e.target.value })}
+                      aria-label={t("menu.name_color")}
+                      title={t("menu.name_color")}
+                      className="h-6 w-6 shrink-0 cursor-pointer appearance-none rounded-lg border-0 bg-transparent p-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:rounded-md [&::-webkit-color-swatch]:border-0 [&::-moz-color-swatch]:rounded-md [&::-moz-color-swatch]:border-0"
+                      style={{ backgroundColor: taco.nameColor ?? "#33264a" }}
+                    />
+                    <input
+                      value={taco.name}
+                      onChange={(e) => updateTaco(taco.id, { name: e.target.value })}
+                      className="min-w-0 flex-1 bg-transparent font-display text-lg font-black outline-none"
+                      style={{ color: taco.nameColor ?? "#33264a" }}
+                    />
+                  </div>
                   <input
                     value={taco.note}
                     onChange={(e) => updateTaco(taco.id, { note: e.target.value })}
