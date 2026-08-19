@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="es">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" href="/favicon.ico" sizes="any" />
@@ -8,22 +8,39 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
     <meta name="theme-color" content="#17b3ab" />
-    <meta name="description" content="Tacos. Tacos. Tacos. · Taqueria Sabrina" />
+    <link rel="canonical" href="https://taqueriasabrina.com/" />
+
+    <!-- SEO — Spanish-focused (the stand is in Utrera, Sevilla). -->
+    <meta
+      name="description"
+      content="Taquería mexicana en Utrera (Sevilla). Tacos mexicanos recién hechos, con opciones veganas y sin gluten. Oferta 1×3€ · 2×5€ · 3×7€. Consulta el menú y los próximos eventos."
+    />
+    <meta
+      name="keywords"
+      content="tacos, tacos mexicanos, comida mexicana, taquería, taquería en Utrera, tacos en Utrera, tacos Sevilla, tacos veganos, tacos sin gluten, comida mexicana Utrera, Taqueria Sabrina"
+    />
 
     <!-- Social share card (Open Graph + Twitter). Absolute URLs required by
          scrapers; the image is the logo on the cream brand background. -->
     <meta property="og:type" content="website" />
+    <meta property="og:locale" content="es_ES" />
     <meta property="og:site_name" content="Taqueria Sabrina" />
-    <meta property="og:title" content="Taqueria Sabrina" />
-    <meta property="og:description" content="Tacos. Tacos. Tacos." />
+    <meta property="og:title" content="Taqueria Sabrina · Tacos mexicanos en Utrera" />
+    <meta
+      property="og:description"
+      content="Taquería mexicana en Utrera (Sevilla). Tacos recién hechos, con opciones veganas y sin gluten. 1×3€ · 2×5€ · 3×7€."
+    />
     <meta property="og:url" content="https://taqueriasabrina.com/" />
     <meta property="og:image" content="https://taqueriasabrina.com/og-image.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="Taqueria Sabrina" />
+    <meta property="og:image:alt" content="Taqueria Sabrina — tacos mexicanos en Utrera, Sevilla" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Taqueria Sabrina" />
-    <meta name="twitter:description" content="Tacos. Tacos. Tacos." />
+    <meta name="twitter:title" content="Taqueria Sabrina · Tacos mexicanos en Utrera" />
+    <meta
+      name="twitter:description"
+      content="Taquería mexicana en Utrera (Sevilla). Tacos recién hechos, con opciones veganas y sin gluten."
+    />
     <meta name="twitter:image" content="https://taqueriasabrina.com/og-image.png" />
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -33,6 +50,29 @@
       rel="stylesheet"
     />
     <title>Taqueria Sabrina</title>
+
+    <!-- Structured data so search engines know this is a Mexican taquería in
+         Utrera, Sevilla, with vegan / gluten-free options. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Restaurant",
+        "name": "Taqueria Sabrina",
+        "description": "Taquería mexicana en Utrera (Sevilla). Tacos mexicanos recién hechos, con opciones veganas y sin gluten.",
+        "servesCuisine": ["Mexicana", "Mexican", "Tacos"],
+        "url": "https://taqueriasabrina.com/",
+        "image": "https://taqueriasabrina.com/og-image.png",
+        "priceRange": "€",
+        "sameAs": ["https://instagram.com/taqueriasabrina"],
+        "address": {
+          "@type": "PostalAddress",
+          "addressLocality": "Utrera",
+          "addressRegion": "Sevilla",
+          "addressCountry": "ES"
+        },
+        "areaServed": "Utrera, Sevilla, España"
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

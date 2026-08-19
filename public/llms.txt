@@ -1,13 +1,15 @@
 # Taqueria Sabrina
 
-> Taqueria Sabrina is a Mexican food pop-up (taquería) based in Utrera, Spain — in the province of Seville, Andalusia. We serve authentic, freshly made Mexican tacos at pop-up events around the area.
+> Taqueria Sabrina is a Mexican food pop-up (taquería mexicana) based in Utrera, Spain — in the province of Seville (Sevilla), Andalusia. We serve authentic, freshly made Mexican tacos at pop-up events around the area, with vegan and gluten-free options.
 
 ## About
 
-Taqueria Sabrina is a mobile taco stand bringing real Mexican street food — tacos — to Utrera and the surrounding Sevilla region of southern Spain. Everything is made fresh at each pop-up. We rotate a weekly selection of tacos and specials, including plant-based and vegetarian options.
+Taqueria Sabrina is a mobile taco stand bringing real Mexican street food — tacos — to Utrera and the surrounding Sevilla region of southern Spain. Everything is made fresh at each pop-up. We rotate a weekly selection of tacos and specials, with vegan, vegetarian, and gluten-free options available.
 
-Cuisine: Mexican food, tacos, Mexican street food (comida mexicana, tacos).
+Cuisine: Mexican food, tacos, Mexican street food (comida mexicana, tacos, taquería).
 Location: Utrera, Sevilla, Andalucía, Spain.
+Dietary options: vegan (vegano), vegetarian (vegetariano), gluten-free (sin gluten).
+Language: primarily Spanish (español).
 
 ## The deal
 
