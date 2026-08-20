@@ -103,7 +103,8 @@ create table if not exists app_state (
   tacos_sold  int     not null default 325,
   tabs        jsonb   not null default '[]',
   special_event       boolean not null default false,
-  special_event_label text    not null default ''
+  special_event_label text    not null default '',
+  tortillas   int
 );
 -- App state id 1 = live (drives the public homepage); id 2 = the admin/admin
 -- demo sandbox (created automatically on first demo login).
@@ -122,6 +123,9 @@ alter table app_state add column if not exists tabs         jsonb   not null def
 -- also lets the stand run a menu with no tacos (the deal banner then hides).
 alter table app_state add column if not exists special_event       boolean not null default false;
 alter table app_state add column if not exists special_event_label text    not null default '';
+-- tortillas: shared inventory pool that caps total taco availability (nullable =
+-- N/A / untracked). Per-item stock lives inside the menu jsonb (no column).
+alter table app_state add column if not exists tortillas           int;
 
 -- Enable Row Level Security, then allow the anon key full access (prototype:
 -- the app is gated by a client-side crew passcode, not per-user auth).

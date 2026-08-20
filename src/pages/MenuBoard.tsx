@@ -1,17 +1,19 @@
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
-import { useLiveBoard, eventIsToday, hoursLabel, parseEventDate, recordVisit, startBoardPresence, stopBoardPresence, type Taco } from "../lib/store";
+import { useLiveBoard, eventIsToday, hoursLabel, parseEventDate, recordVisit, startBoardPresence, stopBoardPresence, isSoldOutEff, isLowEff, type Taco } from "../lib/store";
 import { useI18n } from "../lib/i18n";
 import LangToggle from "../components/LangToggle";
 import Logo from "../components/Logo";
 import Chillis from "../components/Chilli";
 
 /** One menu row on the public board (used for both tacos and "Other Stuff"). */
-function ItemCard({ item, money, soldOut }: { item: Taco; money: (n: number) => string; soldOut: string }) {
+function ItemCard({ item, money, soldOut, tortillas, lowLabel }: { item: Taco; money: (n: number) => string; soldOut: string; tortillas: number | null; lowLabel: string }) {
+  const eff = isSoldOutEff(item, tortillas); // manual sold-out OR a tracked count at 0
+  const low = !eff && isLowEff(item, tortillas);
   return (
     <div
       className="flex items-center gap-4 rounded-3xl border-2 bg-paper p-4 shadow-sm"
-      style={{ borderColor: item.soldOut ? "#f0e3ea" : `${item.tint}55`, opacity: item.soldOut ? 0.55 : 1 }}
+      style={{ borderColor: eff ? "#f0e3ea" : `${item.tint}55`, opacity: eff ? 0.55 : 1 }}
     >
       <span className="h-12 w-2 shrink-0 rounded-full" style={{ backgroundColor: item.tint }} />
       <div className="min-w-0 flex-1">
@@ -21,8 +23,9 @@ function ItemCard({ item, money, soldOut }: { item: Taco; money: (n: number) => 
         </div>
         {item.note && <p className="mt-1 text-[15px] font-semibold leading-snug text-ink">{item.note}</p>}
         {item.note2 && <p className="mt-1 text-[13px] leading-snug text-ink-soft">{item.note2}</p>}
+        {low && <p className="mt-1 text-[13px] font-black text-pink-deep">{lowLabel}</p>}
       </div>
-      {item.soldOut ? (
+      {eff ? (
         <span className="rounded-full bg-cream px-3 py-1 text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">
           {soldOut}
         </span>
@@ -163,7 +166,7 @@ export default function MenuBoard() {
         {anyActive ? (
           <div className="space-y-3">
             {(hasTacos ? tacos : others).map((item) => (
-              <ItemCard key={item.id} item={item} money={money} soldOut={t("board.soldout")} />
+              <ItemCard key={item.id} item={item} money={money} soldOut={t("board.soldout")} tortillas={state.tortillas} lowLabel={t("board.low")} />
             ))}
           </div>
         ) : (
@@ -222,7 +225,7 @@ export default function MenuBoard() {
             <h2 className="mb-3 text-center font-display text-2xl font-black text-ink">{t("board.other")}</h2>
             <div className="space-y-3">
               {others.map((item) => (
-                <ItemCard key={item.id} item={item} money={money} soldOut={t("board.soldout")} />
+                <ItemCard key={item.id} item={item} money={money} soldOut={t("board.soldout")} tortillas={state.tortillas} lowLabel={t("board.low")} />
               ))}
             </div>
           </div>

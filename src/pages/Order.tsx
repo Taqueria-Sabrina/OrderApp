@@ -12,6 +12,9 @@ import {
   tacoCountOf,
   alaCarteTotalOf,
   tacoListTotal,
+  stockLeft,
+  isSoldOutEff,
+  isLowEff,
   type PaymentMethod,
   type Tab,
 } from "../lib/store";
@@ -340,12 +343,22 @@ export default function Order() {
       <div className="grid grid-cols-2 gap-3 px-5 pb-4">
         {menu.map((taco) => {
           const c = qty[taco.id] ?? 0;
+          // Cart-aware availability: an item's own stock AND (for tacos) the
+          // shared tortilla pool minus tacos already in this cart.
+          const soldOutEff = isSoldOutEff(taco, state.tortillas);
+          const tortLeft = state.tortillas == null ? Infinity : state.tortillas - tacoQty;
+          const ownLeft = taco.stock == null ? Infinity : taco.stock - c;
+          const avail = taco.isTaco ? Math.min(ownLeft, tortLeft) : ownLeft;
+          const canAdd = !soldOutEff && avail > 0;
+          const low = !soldOutEff && isLowEff(taco, state.tortillas);
+          const left = stockLeft(taco, state.tortillas);
           return (
             <button
               key={taco.id}
-              onClick={() => set(taco.id, 1)}
+              onClick={() => canAdd && set(taco.id, 1)}
+              disabled={!canAdd && c === 0}
               className="relative flex flex-col justify-between rounded-3xl border-2 bg-paper p-4 text-left shadow-sm transition active:scale-[0.98]"
-              style={{ borderColor: c ? taco.tint : "#f0e3ea", backgroundColor: c ? `${taco.tint}18` : "#ffffff" }}
+              style={{ borderColor: c ? taco.tint : "#f0e3ea", backgroundColor: c ? `${taco.tint}18` : "#ffffff", opacity: soldOutEff ? 0.55 : 1 }}
             >
               {c > 0 && (
                 <span className="absolute -right-2 -top-2 flex h-8 w-8 items-center justify-center rounded-full text-sm font-black text-white shadow" style={{ backgroundColor: taco.tint }}>
@@ -357,6 +370,11 @@ export default function Order() {
                 <p className="font-display text-lg font-black leading-tight text-ink">{taco.name}</p>
                 <p className="mt-0.5 text-[11px] leading-tight text-ink-soft">{taco.note}</p>
                 <p className="mt-2 text-sm font-black" style={{ color: taco.tint }}>{money(taco.price)}</p>
+                {soldOutEff ? (
+                  <p className="mt-1 text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">{t("board.soldout")}</p>
+                ) : low ? (
+                  <p className="mt-1 text-[11px] font-extrabold text-pink-deep">{t("board.low")} · {left}</p>
+                ) : null}
               </div>
               {c > 0 && (
                 <span

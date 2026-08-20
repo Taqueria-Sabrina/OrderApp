@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { useStore, updateTaco, resetService, setOpen, setLocation, setSchedule, setSpecialEvent, addMenuItem, removeMenuItem, isDemo, useDemoControl, setDemoEnabled, bootDemo, startBoardPresence, stopBoardPresence, fetchVisitsTotal } from "../lib/store";
+import { useStore, updateTaco, resetService, setOpen, setLocation, setSchedule, setSpecialEvent, setTortillas, addMenuItem, removeMenuItem, isDemo, useDemoControl, setDemoEnabled, bootDemo, startBoardPresence, stopBoardPresence, fetchVisitsTotal, LOW_STOCK } from "../lib/store";
 import { useI18n } from "../lib/i18n";
 import { ChilliPicker } from "../components/Chilli";
 import LiveBadge from "../components/LiveBadge";
@@ -214,6 +214,34 @@ export default function Menu() {
             </div>
           </div>
 
+          {/* Tortillas — the shared pool that caps total taco availability.
+              Blank = N/A (untracked). Doesn't affect non-taco extras. */}
+          <div className="mt-4 border-t border-line pt-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-display text-lg font-black text-ink">{t("menu.tortillas")}</p>
+                <p className="text-[12px] text-ink-soft">{t("menu.tortillas_sub")}</p>
+              </div>
+              <input
+                type="number"
+                min={0}
+                inputMode="numeric"
+                value={state.tortillas ?? ""}
+                placeholder={t("menu.stock_na")}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setTortillas(v === "" ? null : Math.max(0, Math.floor(Number(v) || 0)));
+                }}
+                className="w-20 shrink-0 rounded-xl border-2 border-line bg-cream px-2 py-2.5 text-center text-lg font-black text-ink outline-none placeholder:text-sm placeholder:font-bold placeholder:text-ink-soft"
+              />
+            </div>
+            {state.tortillas !== null && state.tortillas <= LOW_STOCK && (
+              <p className="mt-2 text-[13px] font-black text-pink-deep">
+                {state.tortillas <= 0 ? t("menu.tortillas_out") : t("menu.tortillas_low", { n: state.tortillas })}
+              </p>
+            )}
+          </div>
+
           {/* Special-event header — sparkly banner at the top of the public menu */}
           <div className="mt-4 border-t border-line pt-4">
             <div className="flex items-center justify-between">
@@ -311,6 +339,23 @@ export default function Menu() {
                 <span className="text-xs font-extrabold uppercase tracking-wide text-ink-soft">{t("menu.heat")}</span>
                 <ChilliPicker value={taco.heat} onChange={(v) => updateTaco(taco.id, { heat: v })} />
               </div>
+              {/* Stock — blank = N/A (untracked). A number decrements as orders
+                  fire and blocks overselling. Type a count mid-service anytime. */}
+              <label className="ml-auto flex items-center gap-2">
+                <span className="text-xs font-extrabold uppercase tracking-wide text-ink-soft">{t("menu.stock")}</span>
+                <input
+                  type="number"
+                  min={0}
+                  inputMode="numeric"
+                  value={taco.stock ?? ""}
+                  placeholder={t("menu.stock_na")}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    updateTaco(taco.id, { stock: v === "" ? null : Math.max(0, Math.floor(Number(v) || 0)) });
+                  }}
+                  className="w-16 rounded-xl bg-cream px-2 py-2 text-center text-base font-black text-ink outline-none placeholder:text-sm placeholder:font-bold placeholder:text-ink-soft"
+                />
+              </label>
             </div>
             <div className="mt-3 flex items-center justify-between border-t border-line pt-3">
               <div className="flex items-center gap-2">

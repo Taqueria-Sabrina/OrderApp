@@ -60,6 +60,8 @@ export type Taco = {
   retired?: boolean; // taken out of rotation entirely — kept for records + restore,
   // hidden from the active editor/board/order screen. A retired item's id is
   // never reused, so historical reports stay unambiguous.
+  stock?: number | null; // units left THIS service. undefined/null = N/A (untracked,
+  // no limit/warning). A number decrements as orders fire and blocks overselling.
 };
 
 // "done" is a terminal, archived state: the ticket has left the live queue
@@ -128,6 +130,7 @@ export type State = {
   openTime: string; // service start "HH:MM" ("" if none)
   closeTime: string; // service end "HH:MM" ("" if none)
   tacosSold: number; // cumulative items sold (persists across close-outs; public counter)
+  tortillas: number | null; // tortillas left THIS service (caps total taco availability); null = N/A
   specialEvent: boolean; // show the sparkly "Special Event" header atop the public board
   specialEventLabel: string; // the header text (customizable; defaults per-locale)
 };
@@ -187,7 +190,7 @@ function seedArchives(): Archive[] {
 const DEFAULT_LOCATION = "La Cocina Lot";
 // Live counter seeded at 325 (tacos sold before this feature existed).
 const SEED_TACOS_SOLD = 325;
-const STOREFRONT_DEFAULTS = { open: true, location: DEFAULT_LOCATION, eventDate: "", openTime: "21:00", closeTime: "23:00", tacosSold: SEED_TACOS_SOLD, specialEvent: false, specialEventLabel: "" };
+const STOREFRONT_DEFAULTS = { open: true, location: DEFAULT_LOCATION, eventDate: "", openTime: "21:00", closeTime: "23:00", tacosSold: SEED_TACOS_SOLD, specialEvent: false, specialEventLabel: "", tortillas: null as number | null };
 
 function defaultState(): State {
   return { menu: DEFAULT_MENU, orders: seedOrders(), nextNumber: 48, archives: seedArchives(), tabs: [], ...STOREFRONT_DEFAULTS };
@@ -224,6 +227,7 @@ function load(): State {
     if (typeof parsed.openTime !== "string") parsed.openTime = STOREFRONT_DEFAULTS.openTime;
     if (typeof parsed.closeTime !== "string") parsed.closeTime = STOREFRONT_DEFAULTS.closeTime;
     if (typeof parsed.tacosSold !== "number") parsed.tacosSold = SEED_TACOS_SOLD;
+    if (typeof parsed.tortillas !== "number" && parsed.tortillas !== null) parsed.tortillas = null;
     if (typeof parsed.specialEvent !== "boolean") parsed.specialEvent = false;
     if (typeof parsed.specialEventLabel !== "string") parsed.specialEventLabel = "";
     if (!parsed.tabs) parsed.tabs = [];
@@ -314,7 +318,7 @@ export function useStore(): State {
 
 export type BoardSnapshot = Pick<
   State,
-  "menu" | "open" | "location" | "eventDate" | "openTime" | "closeTime" | "orders" | "tacosSold" | "specialEvent" | "specialEventLabel"
+  "menu" | "open" | "location" | "eventDate" | "openTime" | "closeTime" | "orders" | "tacosSold" | "specialEvent" | "specialEventLabel" | "tortillas"
 >;
 
 function boardOf(s: Pick<State, keyof BoardSnapshot>): BoardSnapshot {
@@ -329,6 +333,7 @@ function boardOf(s: Pick<State, keyof BoardSnapshot>): BoardSnapshot {
     tacosSold: s.tacosSold,
     specialEvent: s.specialEvent,
     specialEventLabel: s.specialEventLabel,
+    tortillas: s.tortillas,
   };
 }
 
@@ -471,6 +476,7 @@ async function hydrateFromCloud() {
         tabs?: Tab[] | null;
         special_event?: boolean | null;
         special_event_label?: string | null;
+        tortillas?: number | null;
       }
     | null;
 
@@ -491,6 +497,7 @@ async function hydrateFromCloud() {
       tabs: [],
       special_event: seededStorefront.specialEvent,
       special_event_label: seededStorefront.specialEventLabel,
+      tortillas: seededStorefront.tortillas,
     });
     setState({ menu: DEFAULT_MENU, orders: [], nextNumber: 1, archives: [], tabs: [], ...seededStorefront });
     return;
@@ -511,6 +518,7 @@ async function hydrateFromCloud() {
     tacosSold: app.tacos_sold ?? SEED_TACOS_SOLD,
     specialEvent: app.special_event ?? false,
     specialEventLabel: app.special_event_label ?? "",
+    tortillas: app.tortillas ?? null,
   });
 }
 
@@ -533,6 +541,7 @@ async function fetchLiveBoard() {
     tacos_sold?: number | null;
     special_event?: boolean | null;
     special_event_label?: string | null;
+    tortillas?: number | null;
   } | null;
   if (!app) return;
   // Live board only ever shows live-namespace orders (missing env → 'live').
@@ -551,6 +560,7 @@ async function fetchLiveBoard() {
     tacosSold: app.tacos_sold ?? SEED_TACOS_SOLD,
     specialEvent: app.special_event ?? false,
     specialEventLabel: app.special_event_label ?? "",
+    tortillas: app.tortillas ?? null,
   });
   // demo_enabled column may not exist yet (pre-migration) → default enabled.
   setControl({ demoEnabled: app.demo_enabled ?? true });
@@ -848,6 +858,24 @@ export async function restoreRecovery(entry: RecoveryEntry): Promise<boolean> {
   return true;
 }
 
+// ---- Inventory (per-item stock + shared tortilla pool) ----
+
+/** Global low-stock threshold: a tracked count at or below this (but > 0) warns. */
+export const LOW_STOCK = 3;
+
+/** Menu with each ordered item's tracked stock reduced by qty (floored at 0).
+ *  Untracked items (stock null/undefined) are left alone. */
+function applyStock(menu: Taco[], items: Record<string, number>, sign: -1 | 1): Taco[] {
+  return menu.map((t) => {
+    const q = items[t.id];
+    if (!q || t.stock === null || t.stock === undefined) return t;
+    return { ...t, stock: Math.max(0, t.stock + sign * q) };
+  });
+}
+function applyTortillas(tortillas: number | null, tacoN: number, sign: -1 | 1): number | null {
+  return tortillas === null ? null : Math.max(0, tortillas + sign * tacoN);
+}
+
 export function fireOrder(items: Record<string, number>, note: string, name = "", payment?: PaymentMethod, tabId?: string, table = "") {
   const cleaned: Record<string, number> = {};
   for (const [id, qty] of Object.entries(items)) if (qty > 0) cleaned[id] = qty;
@@ -867,11 +895,16 @@ export function fireOrder(items: Record<string, number>, note: string, name = ""
   const nextNumber = state.nextNumber + 1;
   // Bump the cumulative tacos-sold counter (public board) by this order's tacos.
   // Every order that reaches the kitchen counts — including comp and pay-later.
-  const tacosSold = state.tacosSold + tacoCountOf(cleaned, state.menu);
-  setState({ ...state, orders: [...state.orders, order], nextNumber, tacosSold });
+  const tacoN = tacoCountOf(cleaned, state.menu);
+  const tacosSold = state.tacosSold + tacoN;
+  // Draw down inventory: each item's own stock, and the shared tortilla pool by
+  // the taco count. Untracked (N/A) counts are left untouched.
+  const menu = applyStock(state.menu, cleaned, -1);
+  const tortillas = applyTortillas(state.tortillas, tacoN, -1);
+  setState({ ...state, orders: [...state.orders, order], nextNumber, tacosSold, menu, tortillas });
   if (MODE === "cloud" && supabase) {
     push(supabase.from("orders").insert(orderToRow(order)));
-    push(supabase.from("app_state").update({ next_number: nextNumber, tacos_sold: tacosSold }).eq("id", APP_STATE_ID));
+    push(supabase.from("app_state").update({ next_number: nextNumber, tacos_sold: tacosSold, menu, tortillas }).eq("id", APP_STATE_ID));
   }
 }
 
@@ -940,17 +973,19 @@ export function bumpOrder(id: string) {
  */
 export async function deleteOrder(id: string) {
   const order = state.orders.find((o) => o.id === id);
+  const tacoN = order ? tacoCountOf(order.items, state.menu) : 0;
   // Cancelling backs the order's tacos out of the cumulative counter (floored at 0).
-  const tacosSold = order
-    ? Math.max(0, state.tacosSold - tacoCountOf(order.items, state.menu))
-    : state.tacosSold;
-  setState({ ...state, orders: state.orders.filter((o) => o.id !== id), tacosSold });
+  const tacosSold = Math.max(0, state.tacosSold - tacoN);
+  // Return its inventory to stock + the tortilla pool (tracked counts only).
+  const menu = order ? applyStock(state.menu, order.items, 1) : state.menu;
+  const tortillas = order ? applyTortillas(state.tortillas, tacoN, 1) : state.tortillas;
+  setState({ ...state, orders: state.orders.filter((o) => o.id !== id), tacosSold, menu, tortillas });
   if (MODE === "cloud" && supabase) {
     // Save to recovery FIRST — only delete the real row once it's safely stored.
     // If the recovery save fails, skip the delete; the next hydrate re-adds it.
     if (order && !(await recordTrash("order", id, order, "order deleted"))) return;
     push(supabase.from("orders").delete().eq("id", id));
-    if (order) push(supabase.from("app_state").update({ tacos_sold: tacosSold }).eq("id", APP_STATE_ID));
+    if (order) push(supabase.from("app_state").update({ tacos_sold: tacosSold, menu, tortillas }).eq("id", APP_STATE_ID));
   }
 }
 
@@ -991,6 +1026,14 @@ export function setSchedule(patch: Partial<Pick<State, "eventDate" | "openTime" 
     if (patch.openTime !== undefined) row.open_time = patch.openTime;
     if (patch.closeTime !== undefined) row.close_time = patch.closeTime;
     push(supabase.from("app_state").update(row).eq("id", APP_STATE_ID));
+  }
+}
+
+/** Set the shared tortilla count for the service. null = N/A (untracked). */
+export function setTortillas(tortillas: number | null) {
+  setState({ ...state, tortillas });
+  if (MODE === "cloud" && supabase) {
+    push(supabase.from("app_state").update({ tortillas }).eq("id", APP_STATE_ID));
   }
 }
 
@@ -1080,6 +1123,7 @@ export async function resetService() {
           close_time: STOREFRONT_DEFAULTS.closeTime,
           special_event: STOREFRONT_DEFAULTS.specialEvent,
           special_event_label: STOREFRONT_DEFAULTS.specialEventLabel,
+          tortillas: STOREFRONT_DEFAULTS.tortillas,
         })
         .eq("id", APP_STATE_ID),
     );
@@ -1102,8 +1146,11 @@ export async function closeOutDay(): Promise<boolean> {
   // Snapshot the menu as it is right now so this service's report is frozen —
   // later renames/retires can't rewrite what these tacos were called today.
   const archive: Archive = { id: uid(), closedAt: Date.now(), orders: state.orders, tabs: state.tabs, menu: state.menu };
+  // Inventory is per-service: reset every item's count and the tortilla pool to
+  // N/A (untracked) at close-out so tomorrow starts fresh, not off yesterday's.
+  const clearedMenu = state.menu.map((t) => ({ ...t, stock: undefined }));
   const clear = () =>
-    setState({ ...state, orders: [], nextNumber: 1, tabs: [], archives: [archive, ...state.archives] });
+    setState({ ...state, orders: [], nextNumber: 1, tabs: [], archives: [archive, ...state.archives], menu: clearedMenu, tortillas: null });
 
   if (MODE === "cloud" && supabase) {
     // CRITICAL: persist the archive FIRST and confirm it saved before we delete
@@ -1120,7 +1167,7 @@ export async function closeOutDay(): Promise<boolean> {
     clear();
     const orderIds = archive.orders.map((o) => o.id);
     if (orderIds.length) push(supabase.from("orders").delete().in("id", orderIds));
-    push(supabase.from("app_state").update({ next_number: 1, tabs: [] }).eq("id", APP_STATE_ID));
+    push(supabase.from("app_state").update({ next_number: 1, tabs: [], menu: clearedMenu, tortillas: null }).eq("id", APP_STATE_ID));
     return true;
   }
 
@@ -1143,6 +1190,33 @@ export async function deleteArchive(id: string) {
 
 export function menuById(state: State) {
   return Object.fromEntries(state.menu.map((t) => [t.id, t]));
+}
+
+// ---- Inventory selectors ----
+
+/** Units left for an item given the shared tortilla pool. null = untracked (∞).
+ *  Taco items are capped by BOTH their own stock and remaining tortillas. */
+export function stockLeft(t: Taco, tortillas: number | null): number | null {
+  const own = t.stock === null || t.stock === undefined ? null : t.stock;
+  if (!t.isTaco) return own;
+  if (own === null && tortillas === null) return null;
+  if (own === null) return tortillas;
+  if (tortillas === null) return own;
+  return Math.min(own, tortillas);
+}
+
+/** True when an item is effectively unavailable: manual sold-out flag, or a
+ *  tracked count that has hit 0 (its own stock, or — for tacos — tortillas). */
+export function isSoldOutEff(t: Taco, tortillas: number | null): boolean {
+  if (t.soldOut) return true;
+  const left = stockLeft(t, tortillas);
+  return left !== null && left <= 0;
+}
+
+/** True when a tracked count is low (1..LOW_STOCK) — warn but still sellable. */
+export function isLowEff(t: Taco, tortillas: number | null): boolean {
+  const left = stockLeft(t, tortillas);
+  return left !== null && left > 0 && left <= LOW_STOCK;
 }
 
 // The sales selectors below accept a plain order list so they work on both the
