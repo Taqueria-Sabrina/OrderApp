@@ -861,7 +861,7 @@ export async function restoreRecovery(entry: RecoveryEntry): Promise<boolean> {
 // ---- Inventory (per-item stock + shared tortilla pool) ----
 
 /** Global low-stock threshold: a tracked count at or below this (but > 0) warns. */
-export const LOW_STOCK = 3;
+export const LOW_STOCK = 5;
 
 /** Menu with each ordered item's tracked stock reduced by qty (floored at 0).
  *  Untracked items (stock null/undefined) are left alone. */
