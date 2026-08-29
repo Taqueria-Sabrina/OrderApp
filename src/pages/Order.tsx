@@ -271,6 +271,10 @@ export default function Order() {
     setQty((q) => ({ ...q, [id]: Math.max(0, (q[id] ?? 0) + delta) }));
 
   const items = menu.reduce((s, taco) => s + (qty[taco.id] ?? 0), 0);
+  // Table number is required — except when joining an existing tab (which
+  // already carries its own table). Blocks Send until a table is entered.
+  const tableMissing = tabId === "" && table.trim() === "";
+  const canSend = items > 0 && !tableMissing;
   const tacoQty = tacoCountOf(qty, state.menu);
   const total = dealPrice(tacoQty) + alaCarteTotalOf(qty, state.menu);
   const savings = tacoListTotal(qty, state.menu) - dealPrice(tacoQty);
@@ -407,8 +411,9 @@ export default function Order() {
             onChange={(e) => setTable(e.target.value)}
             placeholder={t("order.table_ph")}
             disabled={tabId !== ""}
-            inputMode="numeric"
-            className="w-24 shrink-0 rounded-xl border-2 border-line bg-paper px-3 py-3 text-center text-sm font-semibold text-ink placeholder:text-ink-soft focus:border-teal focus:outline-none disabled:opacity-50"
+            inputMode="text"
+            className="w-24 shrink-0 rounded-xl border-2 bg-paper px-3 py-3 text-center text-sm font-semibold text-ink placeholder:text-ink-soft focus:border-teal focus:outline-none disabled:opacity-50"
+            style={{ borderColor: tableMissing ? "#c8437f" : "#f0e3ea" }}
           />
         </div>
         {/* Tab picker appears only once at least one tab is open for the day.
@@ -458,14 +463,17 @@ export default function Order() {
           </div>
           <span className="font-display text-3xl font-black text-ink">{money(total)}</span>
         </div>
+        {items > 0 && tableMissing && (
+          <p className="mb-2 text-center text-xs font-black text-pink-deep">{t("order.table_required")}</p>
+        )}
         <button
           onClick={send}
-          disabled={items === 0}
+          disabled={!canSend}
           className="w-full rounded-2xl py-4 text-lg font-black uppercase tracking-wide transition disabled:opacity-40"
           style={{
             backgroundColor: flash ? "#17b3ab" : "#c8437f",
             color: "#fff",
-            boxShadow: items === 0 ? "none" : flash ? "0 8px 0 #0f8f88" : "0 8px 0 #96225c",
+            boxShadow: !canSend ? "none" : flash ? "0 8px 0 #0f8f88" : "0 8px 0 #96225c",
           }}
         >
           {flash ? t("order.sent") : tabId ? t("order.send_tab") : t("order.send")}

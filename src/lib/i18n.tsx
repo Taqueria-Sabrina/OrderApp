@@ -105,6 +105,7 @@ const ES: Dict = {
   "order.name_ph": "Nombre del cliente (opcional)",
   "order.table_ph": "Mesa",
   "order.table_short": "Mesa ",
+  "order.table_required": "Introduce el número de mesa",
   "order.noname": "Sin nombre",
 
   "hist.kicker": "Trastienda",
@@ -323,6 +324,7 @@ const EN: Dict = {
   "order.name_ph": "Customer name (optional)",
   "order.table_ph": "Table",
   "order.table_short": "Table ",
+  "order.table_required": "Enter a table number",
   "order.noname": "No name",
 
   "hist.kicker": "Back of House",

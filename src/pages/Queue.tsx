@@ -26,7 +26,7 @@ function Card({ order, accent, now }: { order: Order; accent: string; now: numbe
           <span className="font-display text-xl font-black text-ink">#{order.number}</span>
           {order.name && <span className="text-sm font-bold text-pink-deep">{order.name}</span>}
           {order.table && (
-            <span className="rounded-md bg-teal-soft px-2 py-0.5 text-xs font-extrabold uppercase tracking-wide text-teal-deep">
+            <span className="rounded-lg px-2.5 py-1 text-sm font-black uppercase tracking-wide text-white" style={{ backgroundColor: "#17b3ab" }}>
               {t("order.table_short")}{order.table}
             </span>
           )}
