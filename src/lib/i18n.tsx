@@ -138,6 +138,8 @@ const ES: Dict = {
   "order.send_tab": "Añadir a la cuenta →",
   "order.sent": "¡Enviado! ✓",
   "order.save": ({ amt }) => `Ahorras ${amt}`,
+  "order.sec_tacos": "Tacos",
+  "order.sec_extras": "Extras",
   "order.tab_none": "— Sin cuenta / nueva",
   "order.tab_prefix": "Cuenta:",
 
@@ -357,6 +359,8 @@ const EN: Dict = {
   "order.send_tab": "Add to tab →",
   "order.sent": "Sent! ✓",
   "order.save": ({ amt }) => `You save ${amt}`,
+  "order.sec_tacos": "Tacos",
+  "order.sec_extras": "Extras",
   "order.tab_none": "— No tab / new",
   "order.tab_prefix": "Tab:",
 

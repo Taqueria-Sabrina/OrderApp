@@ -344,58 +344,68 @@ export default function Order() {
         </div>
       </header>
 
-      <div className="grid grid-cols-2 gap-3 px-5 pb-4">
-        {menu.map((taco) => {
-          const c = qty[taco.id] ?? 0;
-          // Cart-aware availability: an item's own stock AND (for tacos) the
-          // shared tortilla pool minus tacos already in this cart.
-          const soldOutEff = isSoldOutEff(taco, state.tortillas);
-          const tortLeft = state.tortillas == null ? Infinity : state.tortillas - tacoQty;
-          const ownLeft = taco.stock == null ? Infinity : taco.stock - c;
-          const avail = taco.isTaco ? Math.min(ownLeft, tortLeft) : ownLeft;
-          const canAdd = !soldOutEff && avail > 0;
-          const low = !soldOutEff && isLowEff(taco, state.tortillas);
-          const left = stockLeft(taco, state.tortillas);
-          return (
-            <button
-              key={taco.id}
-              onClick={() => canAdd && set(taco.id, 1)}
-              disabled={!canAdd && c === 0}
-              className="relative flex flex-col justify-between rounded-3xl border-2 bg-paper p-4 text-left shadow-sm transition active:scale-[0.98]"
-              style={{ borderColor: c ? taco.tint : "#f0e3ea", backgroundColor: c ? `${taco.tint}18` : "#ffffff", opacity: soldOutEff ? 0.55 : 1 }}
-            >
-              {c > 0 && (
-                <span className="absolute -right-2 -top-2 flex h-8 w-8 items-center justify-center rounded-full text-sm font-black text-white shadow" style={{ backgroundColor: taco.tint }}>
-                  {c}
-                </span>
-              )}
-              <span className="h-10 w-10 rounded-2xl" style={{ backgroundColor: taco.tint }} />
-              <div className="mt-3">
-                <p className="font-display text-lg font-black leading-tight text-ink">{taco.name}</p>
-                <p className="mt-0.5 text-[11px] leading-tight text-ink-soft">{taco.note}</p>
-                <p className="mt-2 text-sm font-black" style={{ color: taco.tint }}>{money(taco.price)}</p>
-                {soldOutEff ? (
-                  <p className="mt-1 text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">{t("board.soldout")}</p>
-                ) : low ? (
-                  <p className="mt-1 text-[11px] font-extrabold text-pink-deep">{t("board.low")} · {left}</p>
-                ) : null}
-              </div>
-              {c > 0 && (
-                <span
-                  role="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    set(taco.id, -1);
-                  }}
-                  className="absolute bottom-3 right-3 flex h-8 w-8 items-center justify-center rounded-full bg-cream text-lg font-bold text-ink-soft"
-                >
-                  −
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+      {[
+        { key: "tacos", label: t("order.sec_tacos"), list: menu.filter((m) => m.isTaco) },
+        { key: "extras", label: t("order.sec_extras"), list: menu.filter((m) => !m.isTaco) },
+      ]
+        .filter((sec) => sec.list.length > 0)
+        .map((sec) => (
+          <div key={sec.key} className="px-5 pb-4">
+            <h2 className="mb-2 text-[11px] font-extrabold uppercase tracking-[0.2em] text-ink-soft">{sec.label}</h2>
+            <div className="grid grid-cols-2 gap-3">
+              {sec.list.map((taco) => {
+                const c = qty[taco.id] ?? 0;
+                // Cart-aware availability: an item's own stock AND (for tacos) the
+                // shared tortilla pool minus tacos already in this cart.
+                const soldOutEff = isSoldOutEff(taco, state.tortillas);
+                const tortLeft = state.tortillas == null ? Infinity : state.tortillas - tacoQty;
+                const ownLeft = taco.stock == null ? Infinity : taco.stock - c;
+                const avail = taco.isTaco ? Math.min(ownLeft, tortLeft) : ownLeft;
+                const canAdd = !soldOutEff && avail > 0;
+                const low = !soldOutEff && isLowEff(taco, state.tortillas);
+                const left = stockLeft(taco, state.tortillas);
+                return (
+                  <button
+                    key={taco.id}
+                    onClick={() => canAdd && set(taco.id, 1)}
+                    disabled={!canAdd && c === 0}
+                    className="relative flex flex-col justify-between rounded-3xl border-2 bg-paper p-4 text-left shadow-sm transition active:scale-[0.98]"
+                    style={{ borderColor: c ? taco.tint : "#f0e3ea", backgroundColor: c ? `${taco.tint}18` : "#ffffff", opacity: soldOutEff ? 0.55 : 1 }}
+                  >
+                    {c > 0 && (
+                      <span className="absolute -right-2 -top-2 flex h-8 w-8 items-center justify-center rounded-full text-sm font-black text-white shadow" style={{ backgroundColor: taco.tint }}>
+                        {c}
+                      </span>
+                    )}
+                    <span className="h-10 w-10 rounded-2xl" style={{ backgroundColor: taco.tint }} />
+                    <div className="mt-3">
+                      <p className="font-display text-lg font-black leading-tight text-ink">{taco.name}</p>
+                      <p className="mt-0.5 text-[11px] leading-tight text-ink-soft">{taco.note}</p>
+                      <p className="mt-2 text-sm font-black" style={{ color: taco.tint }}>{money(taco.price)}</p>
+                      {soldOutEff ? (
+                        <p className="mt-1 text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">{t("board.soldout")}</p>
+                      ) : low ? (
+                        <p className="mt-1 text-[11px] font-extrabold text-pink-deep">{t("board.low")} · {left}</p>
+                      ) : null}
+                    </div>
+                    {c > 0 && (
+                      <span
+                        role="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          set(taco.id, -1);
+                        }}
+                        className="absolute bottom-3 right-3 flex h-8 w-8 items-center justify-center rounded-full bg-cream text-lg font-bold text-ink-soft"
+                      >
+                        −
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
 
       <div className="space-y-3 px-5 pb-4">
         <div className="flex gap-2">
